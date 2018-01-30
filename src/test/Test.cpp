@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 	GAPointLabelPlacement ga;
 
 	string rootpath = string("/home/oakile/Workspace/FastStaticPointLabelPlacement/problem_instance/");
-	int sets[5] = {100,250,500,750};
+	int sets[5] = {100,250,500,750,1000};
 	for(int c=0; c<5; c++)
 	{
 		string pathofset = "d" + to_string(sets[c]) + "/";

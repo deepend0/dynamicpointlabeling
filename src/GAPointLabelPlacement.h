@@ -27,7 +27,7 @@ public:
 	static int getNumberOfMaskGroupes();
 	static float objective(GAGenome & g);
 	static void generateMask(int depth, double coverage);
-	static void generateGroupedMask(int depth, double coverage);
+	static void generateGroupedMask(int depth, double coverage, int branchingLimit);
 	static int uniformCrossoverWithMasking(const GAGenome&, const GAGenome&,
 				      GAGenome*, GAGenome*);
 	static int uniformCrossoverWithGroupedMasking(const GAGenome&, const GAGenome&,
@@ -40,6 +40,7 @@ private:
 	static int numberOfMaskGroupes;
 	static int* groupedMask;
 	static int lastGeneration;
+	static int pointRivalsLimit;
 	static GASimpleGA* ga;
 };
 

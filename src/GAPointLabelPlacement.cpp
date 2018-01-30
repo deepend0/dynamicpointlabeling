@@ -30,6 +30,7 @@ bool* GAPointLabelPlacement::mask = NULL;
 int* GAPointLabelPlacement::groupedMask = NULL;
 int GAPointLabelPlacement::numberOfMaskGroupes = 0;
 int GAPointLabelPlacement::lastGeneration = -1;
+int GAPointLabelPlacement::pointRivalsLimit = -1;
 GASimpleGA* GAPointLabelPlacement::ga = NULL;
 
 ConflictGraph* GAPointLabelPlacement::getConflictGraph() {
@@ -76,58 +77,94 @@ float GAPointLabelPlacement::objective(GAGenome & g) {
 	return conflictSize;
 }
 void GAPointLabelPlacement::generateMask(int depth, double effectiveCoverage) {
-	generateGroupedMask(depth, effectiveCoverage);
-	if(mask != NULL)
-		delete [] mask;
+	generateGroupedMask(depth, effectiveCoverage, -1);
 	mask = new bool[conflictGraph->getPointNumber()];
 	for(int i=0; i<conflictGraph->getPointNumber();i++) {
 		mask[i] = (groupedMask[i]==0?false:true);
 	}
 }
-void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCoverage) {
+void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCoverage, int branchingLimit) {
 	const int pointNumber = conflictGraph->getPointNumber();
 	const int effectiveMaskSize = pointNumber*effectiveCoverage;
-	if(groupedMask != NULL)
-			delete [] groupedMask;
 	groupedMask = new int[pointNumber];
 	for(int i=0; i<pointNumber; i++) {
 		groupedMask[i] = 0;
 	}
 	if(depth>-1) {
-		vector<int> pointsNonEffectivelyMasked;
-		for(int i=0; i<pointNumber; i++) {
-			pointsNonEffectivelyMasked.push_back(i);
+		vector<int> pointsToBeEffectivelyMaskedLimited;
+		vector<int> pointsToBeEffectivelyMaskedOverLimit;
+		for(int i=0; i<pointNumber; i++)
+		{
+			if(branchingLimit == 0)
+			{
+				pointsToBeEffectivelyMaskedLimited.push_back(i);
+			}
+			else
+			{
+				int pointConflictSize = conflictGraph->getConflictingPoints()[i].size();
+				if(pointConflictSize > branchingLimit)
+				{
+					pointsToBeEffectivelyMaskedOverLimit.push_back(i);
+				}
+				else
+				{
+					pointsToBeEffectivelyMaskedLimited.push_back(i);
+				}
+			}
 		}
 		vector<int> pointsEffectivelyMasked;
+		bool pointsEffectivelyMaskedIndicator[pointNumber];
+		for(int i=0;i<pointNumber; i++)
+		{
+			pointsEffectivelyMaskedIndicator[i] = false;
+		}
 		int lastDepthCurStart = -1;
 		int lastDepthCurEnd = -1;
 		int groupNumber = 0;
-		for(int curEffectiveMaskSize = 0; curEffectiveMaskSize<effectiveMaskSize;) {
+		for(int curEffectiveMaskSize = 0; curEffectiveMaskSize<effectiveMaskSize;)
+		{
 			groupNumber++;
-			int pointToMaskIx = GARandomInt(0,pointsNonEffectivelyMasked.size()-1);
-			int pointToMask = pointsNonEffectivelyMasked[pointToMaskIx];
-			pointsNonEffectivelyMasked.erase(pointsNonEffectivelyMasked.begin()+pointToMaskIx);
+			vector<int>* pointsToBeEffectivelyMasked;
+			if(!pointsToBeEffectivelyMaskedLimited.empty())
+			{
+				pointsToBeEffectivelyMasked = &pointsToBeEffectivelyMaskedLimited;
+			}
+			else
+			{
+				pointsToBeEffectivelyMasked = &pointsToBeEffectivelyMaskedOverLimit;
+			}
+			int pointToMaskIx = GARandomInt(0,pointsToBeEffectivelyMasked->size()-1);
+			int pointToMask = pointsToBeEffectivelyMasked->at(pointToMaskIx);
+
+			pointsToBeEffectivelyMasked->erase(pointsToBeEffectivelyMasked->begin()+pointToMaskIx);
 			pointsEffectivelyMasked.push_back(pointToMask);
+			pointsEffectivelyMaskedIndicator[pointToMask] = true;
 			groupedMask[pointToMask]=groupNumber;
 			curEffectiveMaskSize++;
+
 			lastDepthCurStart=lastDepthCurEnd=pointsEffectivelyMasked.size()-1;
 			for(int curDepth=0; curDepth<depth && curEffectiveMaskSize<effectiveMaskSize; curDepth++) {
 				for(;lastDepthCurStart<=lastDepthCurEnd && curEffectiveMaskSize<effectiveMaskSize; lastDepthCurStart++) {
 					int pointToFindRivals = pointsEffectivelyMasked[lastDepthCurStart];
-					vector<int> conflictingPositions = conflictGraph->getConflictingPositions()[pointToFindRivals];
-					for(vector<int>::iterator it=conflictingPositions.begin(); it!=conflictingPositions.end() && curEffectiveMaskSize<effectiveMaskSize; it++) {
-						int conflictingPosition = *it;
-						int rivalPoint = conflictingPosition/conflictGraph->getPositionNumber();
-						bool existInPointsEffectivelyMasked = false;
-						for(vector<int>::iterator it2=pointsEffectivelyMasked.begin(); it2!=pointsEffectivelyMasked.end(); it2++) {
-							if(*it2 == rivalPoint) {
-								existInPointsEffectivelyMasked = true;
-								break;
+					vector<int> conflictingPoints = conflictGraph->getConflictingPoints()[pointToFindRivals];
+					if(conflictingPoints.size()>branchingLimit && !pointsToBeEffectivelyMaskedLimited.empty())
+					{
+						continue;
+					}
+					for(vector<int>::iterator it=conflictingPoints.begin(); it!=conflictingPoints.end() && curEffectiveMaskSize<effectiveMaskSize; it++) {
+						int conflictingPoint = *it;
+						if(!pointsEffectivelyMaskedIndicator[conflictingPoint]) {
+							for(vector<int>::iterator it2=pointsToBeEffectivelyMasked->begin(); it2!=pointsToBeEffectivelyMasked->end(); it2++)
+							{
+								if(*it2==conflictingPoint)
+								{
+									pointsToBeEffectivelyMasked->erase(it2);
+									break;
+								}
 							}
-						}
-						if(!existInPointsEffectivelyMasked) {
-							pointsEffectivelyMasked.push_back(rivalPoint);
-							groupedMask[rivalPoint]=groupNumber;
+							pointsEffectivelyMasked.push_back(conflictingPoint);
+							pointsEffectivelyMaskedIndicator[conflictingPoint] = true;
+							groupedMask[conflictingPoint]=groupNumber;
 							curEffectiveMaskSize++;
 						}
 					}
@@ -143,6 +180,8 @@ int GAPointLabelPlacement::uniformCrossoverWithMasking(const GAGenome& p1, const
 	double maskCoverage = 0.3 + 0.5 * (double)ga->generation()/(double)ga->nGenerations();
 
 	if(lastGeneration<ga->generation()) {
+		if(mask != NULL)
+			delete [] mask;
 		generateMask(2, maskCoverage);
 		lastGeneration=ga->generation();
 	}
@@ -178,10 +217,12 @@ int GAPointLabelPlacement::uniformCrossoverWithGroupedMasking(const GAGenome& p1
 	for(int i=0;i<numberOfMaskGroupes; i++) {
 		maskGroupParents[i] = GARandomBit();
 	}
-	double maskCoverage = 0.1 + 0.8 * (double)ga->generation()/(double)ga->nGenerations();
 
 	if(lastGeneration<ga->generation()) {
-		generateGroupedMask(1, 0.7);
+		double maskCoverage = 0.1 + 0.8 * (double)ga->generation()/(double)ga->nGenerations();
+		if(groupedMask != NULL)
+				delete [] groupedMask;
+		generateGroupedMask(1, maskCoverage, conflictGraph->getPositionNumber());
 		lastGeneration=ga->generation();
 	}
 
@@ -240,7 +281,7 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph)
 		populationSize++;
 	ga->populationSize(populationSize);
 	ga->minimaxi(GAGeneticAlgorithm::MINIMIZE);
-	ga->nGenerations(pointNumber*3);
+	ga->nGenerations(pointNumber);
 	ga->elitist(GABoolean::gaTrue);
 	ga->terminator(GAGeneticAlgorithm::TerminateUponGeneration);
 	ga->evolve();
