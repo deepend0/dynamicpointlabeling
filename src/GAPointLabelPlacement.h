@@ -23,24 +23,33 @@ public:
 	static ConflictGraph* getConflictGraph();
 	static void setConflictGraph(ConflictGraph* conflictGraph);
 	static bool* getMask();
-	static int* getGroupedMask();
-	static int getNumberOfMaskGroupes();
+	static std::vector<int>* getGroups();
+	static int getNumberOfGroups();
+	static int getNumberOfSelectedGroups();
+	static void initialize(ConflictGraph& conflictGraph);
+	static int* getAlleleGroups();
 	static float objective(GAGenome & g);
 	static void generateMask(int depth, double coverage);
 	static void generateGroupedMask(int depth, double coverage, int branchingLimit);
 	static int uniformCrossoverWithMasking(const GAGenome&, const GAGenome&,
 				      GAGenome*, GAGenome*);
-	static int uniformCrossoverWithGroupedMasking(const GAGenome&, const GAGenome&,
+	static int uniformCrossoverWithRandomPartialGroupedMasking(const GAGenome&, const GAGenome&,
 				      GAGenome*, GAGenome*);
 	Solution& optimize(ConflictGraph& conflictGraph);
 
 private:
 	static ConflictGraph* conflictGraph;
 	static bool* mask;
-	static int numberOfMaskGroupes;
-	static int* groupedMask;
+	static double initialSelectedGroupPortion;
+	static double addedSelectedGroupPortion;
+	static int numberOfGroups;
+	static int numberOfSelectedGroups;
+	static std::vector<int>* groups;
+	static std::vector<int>** selectedGroups;
+	static int* selectedGroupNumbers;
+	static int* alleleGroups;
+	static int alleleNumber;
 	static int lastGeneration;
-	static int pointRivalsLimit;
 	static GASimpleGA* ga;
 };
 

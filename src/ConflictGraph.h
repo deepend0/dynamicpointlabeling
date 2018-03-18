@@ -10,40 +10,26 @@
 
 #include <vector>
 
+#include <Graph.h>
 namespace labelplacement {
+
+using namespace graph;
 
 class ConflictGraph {
 public:
 	ConflictGraph();
 	virtual ~ConflictGraph();
-
-	int getPointNumber() const;
-
-	void setPointNumber(int pointNumber);
-
+	Graph* getConflictGraphOfPoints() const;
+	void setConflictGraphOfPoints(Graph* conflictGraphOfPoints);
+	Graph* getConflictGraphOfPositions() const;
+	void setConflictGraphOfPositions(Graph* conflictGraphOfPositions);
 	int getPositionNumber() const;
-
 	void setPositionNumber(int positionNumber);
 
-	bool** getAdjacencyMatrix() const;
-
-	void setAdjacencyMatrix(bool** adjacencyMatrix);
-
-	std::vector<int>* getConflictingPositions() const;
-
-	void setConflictingPositions(std::vector<int>* conflictingPositions);
-
-	std::vector<int>* getConflictingPoints() const;
-
-	void setConflictingPoints(std::vector<int>* conflictingPoints);
-
 private:
-	int pointNumber;
+	Graph* conflictGraphOfPoints;
+	Graph* conflictGraphOfPositions;
 	int positionNumber;
-	bool** adjacencyMatrix;
-	std::vector<int>* conflictingPositions;
-	std::vector<int>* conflictingPoints;
-
 };
 
 } /* namespace labelplacement */

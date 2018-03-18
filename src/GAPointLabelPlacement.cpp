@@ -13,7 +13,11 @@
 #include <ga/GASimpleGA.h>
 #include <ga/GAPopulation.h>
 
+#include "BoundDiameterMinCutClustering.h"
+
 using namespace std;
+using namespace graph;
+using namespace clustering;
 
 namespace labelplacement {
 
@@ -22,15 +26,20 @@ GAPointLabelPlacement::GAPointLabelPlacement() {
 }
 
 GAPointLabelPlacement::~GAPointLabelPlacement() {
-	// TODO Auto-generated destructor stub
 }
 
 ConflictGraph* GAPointLabelPlacement::conflictGraph = NULL;
 bool* GAPointLabelPlacement::mask = NULL;
-int* GAPointLabelPlacement::groupedMask = NULL;
-int GAPointLabelPlacement::numberOfMaskGroupes = 0;
+double GAPointLabelPlacement::initialSelectedGroupPortion = 0.1;
+double GAPointLabelPlacement::addedSelectedGroupPortion = 0.8;
+int GAPointLabelPlacement::alleleNumber = 0;
+int* GAPointLabelPlacement::alleleGroups = NULL;
+int GAPointLabelPlacement::numberOfGroups = 0;
+vector<int>* GAPointLabelPlacement::groups = NULL;
 int GAPointLabelPlacement::lastGeneration = -1;
-int GAPointLabelPlacement::pointRivalsLimit = -1;
+vector<int>** GAPointLabelPlacement::selectedGroups = NULL;
+int* GAPointLabelPlacement::selectedGroupNumbers = NULL;
+int GAPointLabelPlacement::numberOfSelectedGroups = 0;
 GASimpleGA* GAPointLabelPlacement::ga = NULL;
 
 ConflictGraph* GAPointLabelPlacement::getConflictGraph() {
@@ -42,53 +51,125 @@ void GAPointLabelPlacement::setConflictGraph(ConflictGraph* conflictGraph) {
 bool* GAPointLabelPlacement::getMask() {
 	return GAPointLabelPlacement::mask;
 }
-int* GAPointLabelPlacement::getGroupedMask() {
-	return GAPointLabelPlacement::groupedMask;
+vector<int>* GAPointLabelPlacement::getGroups() {
+	return groups;
 }
-int GAPointLabelPlacement::getNumberOfMaskGroupes() {
-	return GAPointLabelPlacement::numberOfMaskGroupes;
+int GAPointLabelPlacement::getNumberOfGroups() {
+	return GAPointLabelPlacement::numberOfGroups;
 }
+int GAPointLabelPlacement::getNumberOfSelectedGroups() {
+	return GAPointLabelPlacement::numberOfSelectedGroups;
+}
+void GAPointLabelPlacement::initialize(ConflictGraph& conflictGraph) {
+	//cout<<"GAPointLabelPlacement::initialize>start"<<endl;
+	GAPointLabelPlacement::conflictGraph = &conflictGraph;
+	alleleNumber = conflictGraph.getConflictGraphOfPoints()->getVertexNumber();
+	if(alleleGroups!=NULL) {
+		delete alleleGroups;
+	}
+	alleleGroups = new int[alleleNumber];
+	if(groups!=NULL) {
+		delete [] groups;
+	}
+	BoundDiameterMinCutClustering clustering;
+	//cout<<"GAPointLabelPlacement::initialize>>clustering start"<<endl;
+	vector<Graph*>* clusters = clustering.cluster(conflictGraph.getConflictGraphOfPoints(),2);
+	numberOfGroups = clusters->size();
+	cout<<"GAPointLabelPlacement::initialize>>number of groups: "<<numberOfGroups<<endl;
+	groups = new vector<int>[numberOfGroups];
+	for(int i=0; i<numberOfGroups; i++) {
+		Graph* cluster = clusters->at(i);
+		groups[i] = vector<int>(*cluster->getVertices());
+		delete cluster;
+	}
+	delete clusters;
+	//cout<<"GAPointLabelPlacement::initialize>end"<<endl;
+}
+int* GAPointLabelPlacement::getAlleleGroups() {
+	//cout<<"GAPointLabelPlacement::getAlleleGroups>start"<<endl;
+	if(lastGeneration<ga->generation()) {
+		double currentSelectedGroupPortion = initialSelectedGroupPortion + addedSelectedGroupPortion * (double)ga->generation()/(double)ga->nGenerations();
+		numberOfSelectedGroups = numberOfGroups * currentSelectedGroupPortion;
+		//cout<<"GAPointLabelPlacement::getAlleleGroups>num selected groups: "<<numberOfSelectedGroups<<endl;
+	}
+	selectedGroups = new vector<int>*[numberOfSelectedGroups];
+	selectedGroupNumbers = new int[numberOfSelectedGroups];
+	vector<int> groupNumbersToSelect;
+	for(int i=0;i<numberOfGroups;i++){
+		groupNumbersToSelect.push_back(i);
+	}
+	//cout<<"GAPointLabelPlacement::getAlleleGroups>determine random group numbers"<<endl;
+	for(int i=0; i<numberOfSelectedGroups; i++) {
+		int groupNumberToSelectIndex = GARandomInt(0, groupNumbersToSelect.size()-1);
+		int groupNumberToSelect = groupNumbersToSelect[groupNumberToSelectIndex];
+		selectedGroupNumbers[i] = groupNumberToSelect;
+		groupNumbersToSelect.erase(groupNumbersToSelect.begin()+groupNumberToSelectIndex);
+	}
+
+	for(int i=0; i<alleleNumber; i++) {
+		alleleGroups[i] = 0;
+	}
+	//cout<<"GAPointLabelPlacement::getAlleleGroups>assign selected groups"<<endl;
+	for(int i=0; i<numberOfSelectedGroups; i++) {
+		int selectedGroupNumber = selectedGroupNumbers[i];
+		selectedGroups[i] = &getGroups()[selectedGroupNumber];
+		vector<int>* selectedGroup = selectedGroups[i];
+		for(int j=0; j<selectedGroup->size(); j++) {
+			int alleleNumber =  selectedGroup->at(j);
+			alleleGroups[alleleNumber] = i;
+		}
+	}
+	delete [] selectedGroups;
+	delete [] selectedGroupNumbers;
+	selectedGroups = NULL;
+	//cout<<"GAPointLabelPlacement::getAlleleGroups>end"<<endl;
+	lastGeneration=ga->generation();
+	return alleleGroups;
+}
+
 float GAPointLabelPlacement::objective(GAGenome & g) {
 	GA1DArrayAlleleGenome<int> & genome = (GA1DArrayAlleleGenome<int> &) g;
 	float objectiveValue;
 	float potentialConflictSize = 0;
 	float conflictSize = 0;
+	int pointNumber = conflictGraph->getConflictGraphOfPoints()->getVertexNumber();
+	int positionNumber = conflictGraph->getPositionNumber();
 	for(int i=0; i<genome.length(); i++)
 	{
 			int position1 = genome.gene(i);
-			int posIx1 = i*conflictGraph->getPositionNumber()+position1;
+			int posIx1 = i*positionNumber+position1;
 
-			vector<int>* conflictingPoints = conflictGraph->getConflictingPoints()+i;
+			vector<int>* conflictingPoints = conflictGraph->getConflictGraphOfPoints()->getAdjacencyList()+i;
 			for(vector<int>::iterator it=conflictingPoints->begin(); it!=conflictingPoints->end(); it++)
 			{
 				int conflictingPointIx = *it;
 				int position2 = genome.gene(conflictingPointIx);
-				int posIx2 = conflictingPointIx*conflictGraph->getPositionNumber()+position2;
-				if(conflictGraph->getAdjacencyMatrix()[posIx1][posIx2])
+				int posIx2 = conflictingPointIx*positionNumber+position2;
+				if(conflictGraph->getConflictGraphOfPositions()->getAdjacencyMatrix()[posIx1][posIx2])
 				{
 					conflictSize++;
 					break;
 				}
 			}
 
-			potentialConflictSize += conflictGraph->getConflictingPositions()[posIx1].size();
+			potentialConflictSize += conflictGraph->getConflictGraphOfPositions()->getAdjacencyList()[posIx1].size();
 	}
 	objectiveValue = conflictSize + 0.25*potentialConflictSize;
 	return conflictSize;
 }
 void GAPointLabelPlacement::generateMask(int depth, double effectiveCoverage) {
 	generateGroupedMask(depth, effectiveCoverage, -1);
-	mask = new bool[conflictGraph->getPointNumber()];
-	for(int i=0; i<conflictGraph->getPointNumber();i++) {
-		mask[i] = (groupedMask[i]==0?false:true);
+	mask = new bool[alleleNumber];
+	for(int i=0; i<alleleNumber;i++) {
+		mask[i] = (alleleGroups[i]==0?false:true);
 	}
 }
 void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCoverage, int branchingLimit) {
-	const int pointNumber = conflictGraph->getPointNumber();
+	const int pointNumber = alleleNumber;
 	const int effectiveMaskSize = pointNumber*effectiveCoverage;
-	groupedMask = new int[pointNumber];
+	alleleGroups = new int[pointNumber];
 	for(int i=0; i<pointNumber; i++) {
-		groupedMask[i] = 0;
+		alleleGroups[i] = 0;
 	}
 	if(depth>-1) {
 		vector<int> pointsToBeEffectivelyMaskedLimited;
@@ -101,7 +182,7 @@ void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCover
 			}
 			else
 			{
-				int pointConflictSize = conflictGraph->getConflictingPoints()[i].size();
+				int pointConflictSize = conflictGraph->getConflictGraphOfPoints()->getAdjacencyList()[i].size();
 				if(pointConflictSize > branchingLimit)
 				{
 					pointsToBeEffectivelyMaskedOverLimit.push_back(i);
@@ -139,14 +220,14 @@ void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCover
 			pointsToBeEffectivelyMasked->erase(pointsToBeEffectivelyMasked->begin()+pointToMaskIx);
 			pointsEffectivelyMasked.push_back(pointToMask);
 			pointsEffectivelyMaskedIndicator[pointToMask] = true;
-			groupedMask[pointToMask]=groupNumber;
+			alleleGroups[pointToMask]=groupNumber;
 			curEffectiveMaskSize++;
 
 			lastDepthCurStart=lastDepthCurEnd=pointsEffectivelyMasked.size()-1;
 			for(int curDepth=0; curDepth<depth && curEffectiveMaskSize<effectiveMaskSize; curDepth++) {
 				for(;lastDepthCurStart<=lastDepthCurEnd && curEffectiveMaskSize<effectiveMaskSize; lastDepthCurStart++) {
 					int pointToFindRivals = pointsEffectivelyMasked[lastDepthCurStart];
-					vector<int> conflictingPoints = conflictGraph->getConflictingPoints()[pointToFindRivals];
+					vector<int> conflictingPoints = conflictGraph->getConflictGraphOfPoints()->getAdjacencyList()[pointToFindRivals];
 					if(conflictingPoints.size()>branchingLimit && !pointsToBeEffectivelyMaskedLimited.empty())
 					{
 						continue;
@@ -164,7 +245,7 @@ void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCover
 							}
 							pointsEffectivelyMasked.push_back(conflictingPoint);
 							pointsEffectivelyMaskedIndicator[conflictingPoint] = true;
-							groupedMask[conflictingPoint]=groupNumber;
+							alleleGroups[conflictingPoint]=groupNumber;
 							curEffectiveMaskSize++;
 						}
 					}
@@ -172,12 +253,12 @@ void GAPointLabelPlacement::generateGroupedMask(int depth, double effectiveCover
 				lastDepthCurEnd = pointsEffectivelyMasked.size()-1;
 			}
 		}
-		numberOfMaskGroupes = groupNumber;
+		numberOfGroups = groupNumber;
 	}
 }
 int GAPointLabelPlacement::uniformCrossoverWithMasking(const GAGenome& p1, const GAGenome& p2, GAGenome* c1, GAGenome* c2)
 {
-	double maskCoverage = 0.3 + 0.5 * (double)ga->generation()/(double)ga->nGenerations();
+	double maskCoverage = 0.3 + 0.7 * (double)ga->generation()/(double)ga->nGenerations();
 
 	if(lastGeneration<ga->generation()) {
 		if(mask != NULL)
@@ -211,19 +292,12 @@ int GAPointLabelPlacement::uniformCrossoverWithMasking(const GAGenome& p1, const
 	}
 	return 2;
 }
-int GAPointLabelPlacement::uniformCrossoverWithGroupedMasking(const GAGenome& p1, const GAGenome& p2,
+int GAPointLabelPlacement::uniformCrossoverWithRandomPartialGroupedMasking(const GAGenome& p1, const GAGenome& p2,
 			      GAGenome* c1, GAGenome* c2) {
-	int maskGroupParents[numberOfMaskGroupes];
-	for(int i=0;i<numberOfMaskGroupes; i++) {
-		maskGroupParents[i] = GARandomBit();
-	}
-
-	if(lastGeneration<ga->generation()) {
-		double maskCoverage = 0.1 + 0.8 * (double)ga->generation()/(double)ga->nGenerations();
-		if(groupedMask != NULL)
-				delete [] groupedMask;
-		generateGroupedMask(1, maskCoverage, conflictGraph->getPositionNumber());
-		lastGeneration=ga->generation();
+	int* alleleGroups = getAlleleGroups();
+	int alleleGroupParents[numberOfSelectedGroups];
+	for(int i=0;i<numberOfSelectedGroups; i++) {
+		alleleGroupParents[i] = GARandomBit();
 	}
 
 	const GA1DArrayGenome<int> &mom=DYN_CAST(const GA1DArrayGenome<int> &, p1);
@@ -233,8 +307,8 @@ int GAPointLabelPlacement::uniformCrossoverWithGroupedMasking(const GAGenome& p1
 	GA1DArrayGenome<int> &bro=DYN_CAST(GA1DArrayGenome<int> &, *c2);
 
 	for(int i=mom.length()-1; i>=0; i--){
-		if(groupedMask[i]!=0){
-			int maskGroupParent = maskGroupParents[groupedMask[i]-1];
+		if(alleleGroups[i]!=0){
+			int maskGroupParent = alleleGroupParents[alleleGroups[i]];
 			if(maskGroupParent==1) {
 				sis.gene(i, mom.gene(i));
 				bro.gene(i, dad.gene(i));
@@ -257,15 +331,18 @@ int GAPointLabelPlacement::uniformCrossoverWithGroupedMasking(const GAGenome& p1
 }
 Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph)
 {
-	this->conflictGraph = &conflictGraph;
-	int* alleleSet = new int[conflictGraph.getPositionNumber()];
-	for(int i=0;i<conflictGraph.getPositionNumber(); i++)
+	initialize(conflictGraph);
+	int pointNumber = conflictGraph.getConflictGraphOfPoints()->getVertexNumber();
+	int positionsPerPointNumber = conflictGraph.getPositionNumber();
+
+	int* alleleSet = new int[positionsPerPointNumber];
+	for(int i=0;i<positionsPerPointNumber; i++)
 		alleleSet[i] = i;
-	GAAlleleSet<int> positionAlleleSet(conflictGraph.getPositionNumber(), alleleSet);
-	GA1DArrayAlleleGenome<int> genome(conflictGraph.getPointNumber(), positionAlleleSet, objective, NULL);
+	GAAlleleSet<int> positionAlleleSet(positionsPerPointNumber, alleleSet);
+	GA1DArrayAlleleGenome<int> genome(pointNumber, positionAlleleSet, objective, NULL);
 	genome.initializer(GA1DArrayAlleleGenome<int>::UniformInitializer);
 	//genome.crossover(GA1DArrayAlleleGenome<int>::UniformCrossover);
-	genome.crossover(GAPointLabelPlacement::uniformCrossoverWithGroupedMasking);
+	genome.crossover(GAPointLabelPlacement::uniformCrossoverWithRandomPartialGroupedMasking);
 	ga=new GASimpleGA(genome);
 	ga->selector(GARankSelector());
 	GAParameterList params;
@@ -275,13 +352,12 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph)
 	params.set(gaNpMutation, 0.001);
 	params.set(gaNpCrossover, 0.90);
 
-	int pointNumber = conflictGraph.getPointNumber();
 	int populationSize = pointNumber/10;
 	if(populationSize%2==1)
 		populationSize++;
 	ga->populationSize(populationSize);
 	ga->minimaxi(GAGeneticAlgorithm::MINIMIZE);
-	ga->nGenerations(pointNumber);
+	ga->nGenerations(15*pointNumber);
 	ga->elitist(GABoolean::gaTrue);
 	ga->terminator(GAGeneticAlgorithm::TerminateUponGeneration);
 	ga->evolve();
@@ -289,7 +365,7 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph)
 	const GA1DArrayAlleleGenome<unsigned int> & bestIndividual = (GA1DArrayAlleleGenome<unsigned int> &) ga->statistics().bestIndividual();
 	Solution* solution = new Solution(this->conflictGraph);
 	Solution& solutionRef = *solution;
-	int* labelPlacements = new int[conflictGraph.getPointNumber()];
+	int* labelPlacements = new int[pointNumber];
 	solution->setLabelPlacements(labelPlacements);
 	for(int i=0; i<bestIndividual.length(); i++)
 	{
