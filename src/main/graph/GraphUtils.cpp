@@ -25,24 +25,25 @@ void GraphUtils::printGraph(Graph* graph) {
 	int vertexNumber = graph->getVertexNumber();
 	vector<int>* vertices = graph->getVertices();
 
-	cout<<"   ";
-	for(vector<int>::iterator it2=vertices->begin(); it2!=vertices->end(); it2++) {
-		cout<<*it2<<" ";
+	cout << "   ";
+	for (vector<int>::iterator it2 = vertices->begin(); it2 != vertices->end();
+			it2++) {
+		cout << *it2 << " ";
 	}
-	cout<<endl;
-	cout<<"   ";
-	for(int i=0; i<vertexNumber; i++) {
-		cout<<"__";
+	cout << endl;
+	cout << "   ";
+	for (int i = 0; i < vertexNumber; i++) {
+		cout << "__";
 	}
-	cout<<endl;
+	cout << endl;
 	bool** adjacencyMatrix = graph->getAdjacencyMatrix();
-	for(int i=0; i<vertexNumber; i++) {
-		cout<<vertices->at(i)<<"| ";
-		for(int j=0; j<vertexNumber; j++) {
-			cout << (adjacencyMatrix[i][j]?"1":"0") << " ";
+	for (int i = 0; i < vertexNumber; i++) {
+		cout << vertices->at(i) << "| ";
+		for (int j = 0; j < vertexNumber; j++) {
+			cout << (adjacencyMatrix[i][j] ? "1" : "0") << " ";
 		}
-		cout<<endl;
+		cout << endl;
 	}
-	cout<<endl;
+	cout << endl;
 }
 } /* namespace labelplacement */

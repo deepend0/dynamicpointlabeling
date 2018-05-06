@@ -19,11 +19,11 @@ Graph::Graph() {
 
 Graph::~Graph() {
 	delete vertices;
-	delete [] adjacencyList;
-	for(int i=0; i<vertexNumber; i++) {
-		delete [] adjacencyMatrix[i];
+	delete[] adjacencyList;
+	for (int i = 0; i < vertexNumber; i++) {
+		delete[] adjacencyMatrix[i];
 	}
-	delete [] adjacencyMatrix;
+	delete[] adjacencyMatrix;
 }
 
 int Graph::getVertexNumber() const {
@@ -68,21 +68,22 @@ void Graph::setAdjacencyList(std::vector<int>* adjacencyList) {
 
 void Graph::generateAdjacencyMatrixFromAdjacencyList() {
 	this->adjacencyMatrix = new bool*[vertexNumber];
-	for(int i=0; i<vertexNumber; i++) {
+	for (int i = 0; i < vertexNumber; i++) {
 		adjacencyMatrix[i] = new bool[vertexNumber];
 	}
-	for(int i=0; i<vertexNumber; i++) {
-		for(int j=0; j<vertexNumber; j++) {
+	for (int i = 0; i < vertexNumber; i++) {
+		for (int j = 0; j < vertexNumber; j++) {
 			adjacencyMatrix[i][j] = false;
 		}
 	}
-	for(int i=0; i<vertexNumber; i++) {
-		for(std::vector<int>::iterator it=adjacencyList[i].begin(); it!=adjacencyList[i].end(); it++) {
-			adjacencyMatrix[i][*it]=true;
+	for (int i = 0; i < vertexNumber; i++) {
+		for (std::vector<int>::iterator it = adjacencyList[i].begin();
+				it != adjacencyList[i].end(); it++) {
+			adjacencyMatrix[i][*it] = true;
 			edgeNumber++;
 		}
 	}
-	edgeNumber/=2;
+	edgeNumber /= 2;
 }
 } /* namespace labelplacement */
 

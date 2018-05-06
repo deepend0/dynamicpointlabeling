@@ -15,7 +15,7 @@ Solution::Solution(ConflictGraph* conflictGraph) {
 }
 
 Solution::~Solution() {
-	delete [] labelPlacements;
+	delete[] labelPlacements;
 }
 
 int* Solution::getLabelPlacements() {
@@ -25,19 +25,19 @@ void Solution::setLabelPlacements(int* labelPlacements) {
 	this->labelPlacements = labelPlacements;
 }
 
-int Solution::getConflictSize()
-{
+int Solution::getConflictSize() {
 	int conflictSize = 0;
-	for(int i=0; i<conflictGraph->getConflictGraphOfPoints()->getVertexNumber(); i++)
-	{
+	for (int i = 0;
+			i < conflictGraph->getConflictGraphOfPoints()->getVertexNumber();
+			i++) {
 		int position1 = labelPlacements[i];
-		int posIx1 = i*conflictGraph->getPositionNumber()+position1;
-		for(int j=0; j<conflictGraph->getConflictGraphOfPoints()->getVertexNumber(); j++)
-		{
+		int posIx1 = i * conflictGraph->getPositionNumber() + position1;
+		for (int j = 0;
+				j < conflictGraph->getConflictGraphOfPoints()->getVertexNumber();
+				j++) {
 			int position2 = labelPlacements[j];
-			int posIx2 = j*conflictGraph->getPositionNumber()+position2;
-			if(conflictGraph->getConflictGraphOfPositions()->getAdjacencyMatrix()[posIx1][posIx2])
-			{
+			int posIx2 = j * conflictGraph->getPositionNumber() + position2;
+			if (conflictGraph->getConflictGraphOfPositions()->getAdjacencyMatrix()[posIx1][posIx2]) {
 				conflictSize++;
 				break;
 			}

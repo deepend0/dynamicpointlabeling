@@ -11,8 +11,8 @@ namespace labelplacement {
 
 ConflictGraph::ConflictGraph() {
 	this->positionNumber = 0;
-	this->conflictGraphOfPoints=__null;
-	this->conflictGraphOfPositions=__null;
+	this->conflictGraphOfPoints = __null;
+	this->conflictGraphOfPositions = __null;
 }
 
 ConflictGraph::~ConflictGraph() {
@@ -24,8 +24,7 @@ Graph* ConflictGraph::getConflictGraphOfPoints() const {
 	return conflictGraphOfPoints;
 }
 
-void ConflictGraph::setConflictGraphOfPoints(
-		Graph* conflictGraphOfPoints) {
+void ConflictGraph::setConflictGraphOfPoints(Graph* conflictGraphOfPoints) {
 	this->conflictGraphOfPoints = conflictGraphOfPoints;
 }
 

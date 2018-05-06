@@ -39,9 +39,8 @@ ConflictGraph* ConflictGraphLoader::load(string filePath) {
 
 	ifstream ifs;
 	ifs.open(filePath.c_str(), ifstream::in);
-	if(ifs.fail())
-	{
-		cout<<"Opening instance data file is failed."<<endl;
+	if (ifs.fail()) {
+		cout << "Opening instance data file is failed." << endl;
 		return NULL;
 	}
 
@@ -65,26 +64,22 @@ ConflictGraph* ConflictGraphLoader::load(string filePath) {
 	conflictGraphOfPositions->setVertexNumber(totalPositionCount);
 
 	bool** adjacencyMatrix = new bool*[totalPositionCount];
-	for(int i=0; i<totalPositionCount; i++)
-	{
+	for (int i = 0; i < totalPositionCount; i++) {
 		adjacencyMatrix[i] = new bool[totalPositionCount];
-		for(int j=0; j<totalPositionCount; j++)
-		{
+		for (int j = 0; j < totalPositionCount; j++) {
 			adjacencyMatrix[i][j] = false;
 		}
 	}
 	bool** adjacencyMatrixOfPoints = new bool*[pointNumber];
-	for(int i=0; i<pointNumber; i++)
-	{
+	for (int i = 0; i < pointNumber; i++) {
 		adjacencyMatrixOfPoints[i] = new bool[pointNumber];
-		for(int j=0; j<pointNumber; j++)
-		{
+		for (int j = 0; j < pointNumber; j++) {
 			adjacencyMatrixOfPoints[i][j] = false;
 		}
 	}
 
-	vector<int>* conflictingPositions = new vector<int>[totalPositionCount];
-	vector<int>* conflictingPoints = new vector<int>[pointNumber];
+	vector<int>* conflictingPositions = new vector<int> [totalPositionCount];
+	vector<int>* conflictingPoints = new vector<int> [pointNumber];
 
 	conflictGraphOfPositions->setAdjacencyMatrix(adjacencyMatrix);
 	conflictGraphOfPositions->setAdjacencyList(conflictingPositions);
@@ -92,46 +87,47 @@ ConflictGraph* ConflictGraphLoader::load(string filePath) {
 	conflictGraphOfPoints->setAdjacencyMatrix(adjacencyMatrixOfPoints);
 	conflictGraphOfPoints->setAdjacencyList(conflictingPoints);
 
-	int edgeNumberOfPositionConflictGraph=0;
-	int edgeNumberOfPointConflictGraph=0;
-	for(int i=0; i<totalPositionCount; i++)
-	{
+	int edgeNumberOfPositionConflictGraph = 0;
+	int edgeNumberOfPointConflictGraph = 0;
+	for (int i = 0; i < totalPositionCount; i++) {
 		getline(ifs, line); //Line of potential conflict count
 		iss.str(line);
 		getline(iss, line, ' ');
 		int positionConflictCount = atoi(line.c_str());
-		int conflictSize = positionConflictCount-positionNumber+1;
+		int conflictSize = positionConflictCount - positionNumber + 1;
 
 		getline(ifs, line); //Line of potential conflict label numbers
 
 		typedef find_iterator<string::iterator> string_find_iterator;
 		regex numRegex("[0-9]+");
-		string_find_iterator sfit=make_find_iterator(line, regex_finder(numRegex));
-		int currentPointIx = i/positionNumber;
-		for(int j=0; j<positionConflictCount; j++)
-		{
+		string_find_iterator sfit = make_find_iterator(line,
+				regex_finder(numRegex));
+		int currentPointIx = i / positionNumber;
+		for (int j = 0; j < positionConflictCount; j++) {
 			string positionNoStr;
 			positionNoStr = copy_range<string>(*sfit++);
 			int positionNo = atoi(positionNoStr.c_str());
 			int positionIx = positionNo - 1;
 
-			int pointIx = positionIx/positionNumber;
-			if(currentPointIx != pointIx)
-			{
-				adjacencyMatrix[i][positionIx]=true;
+			int pointIx = positionIx / positionNumber;
+			if (currentPointIx != pointIx) {
+				adjacencyMatrix[i][positionIx] = true;
 				edgeNumberOfPositionConflictGraph++;
 				conflictingPositions[i].push_back(positionIx);
 
-				vector<int>* currentConflictingPoints = conflictingPoints+currentPointIx;
+				vector<int>* currentConflictingPoints = conflictingPoints
+						+ currentPointIx;
 				bool isConflictingPointFound = false;
-				for(vector<int>::iterator it=currentConflictingPoints->begin(); it!=currentConflictingPoints->end(); it++) {
+				for (vector<int>::iterator it =
+						currentConflictingPoints->begin();
+						it != currentConflictingPoints->end(); it++) {
 					int conflictingPoint = *it;
-					if(conflictingPoint==pointIx) {
+					if (conflictingPoint == pointIx) {
 						isConflictingPointFound = true;
 						break;
 					}
 				}
-				if(!isConflictingPointFound) {
+				if (!isConflictingPointFound) {
 					adjacencyMatrixOfPoints[currentPointIx][pointIx] = true;
 					edgeNumberOfPointConflictGraph++;
 					currentConflictingPoints->push_back(pointIx);
@@ -139,19 +135,19 @@ ConflictGraph* ConflictGraphLoader::load(string filePath) {
 			}
 		}
 	}
-	edgeNumberOfPositionConflictGraph /=2;
-	edgeNumberOfPointConflictGraph /=2;
+	edgeNumberOfPositionConflictGraph /= 2;
+	edgeNumberOfPointConflictGraph /= 2;
 
 	conflictGraphOfPositions->setEdgeNumber(edgeNumberOfPositionConflictGraph);
 	conflictGraphOfPoints->setEdgeNumber(edgeNumberOfPointConflictGraph);
 
 	vector<int>* verticesOfPositionGraph = new vector<int>();
-	for(int i=0; i<pointNumber*positionNumber; i++) {
+	for (int i = 0; i < pointNumber * positionNumber; i++) {
 		verticesOfPositionGraph->push_back(i);
 	}
 	conflictGraphOfPositions->setVertices(verticesOfPositionGraph);
 	vector<int>* verticesOfPointGraph = new vector<int>();
-	for(int i=0; i<pointNumber; i++) {
+	for (int i = 0; i < pointNumber; i++) {
 		verticesOfPointGraph->push_back(i);
 	}
 	conflictGraphOfPoints->setVertices(verticesOfPointGraph);
