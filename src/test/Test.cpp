@@ -69,7 +69,7 @@ void testGAPointLabelPlacementOptimize() {
 	GAPointLabelPlacement ga;
 	string rootpath =
 			string(
-					"/home/oakile/Workspace/FastStaticPointLabelPlacement/problem_instance/");
+					"/home/oakile/Workspace/DynamicPointLabeling/test/input_data/static");
 	int sets[5] = { 100, 250, 500, 750, 1000 };
 	for (int c = 0; c < 5; c++) {
 		string pathofset = "d" + to_string(sets[c]) + "/";
@@ -79,6 +79,7 @@ void testGAPointLabelPlacementOptimize() {
 			cout << "I: " << filename;
 			string path = rootpath + pathofset + filename;
 			ConflictGraph* cg = cgl.load(path);
+			ga.fileName = filename;
 			//calculateTotalNumberOfConflictingLabels(cg->getConflictGraphOfPositions()->getAdjacencyMatrix(), cg->getConflictGraphOfPoints()->getVertexNumber(), cg->getConflictGraphOfPositions()->getVertexNumber());
 			clock_t startG = clock();
 			Solution& solution = ga.optimize(*cg);

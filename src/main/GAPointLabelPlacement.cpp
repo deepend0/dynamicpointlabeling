@@ -11,8 +11,9 @@
 #include <iostream>
 #include <vector>
 
-#include <ga/GASimpleGA.h>
 #include <ga/GAPopulation.h>
+#include <ga/GASimpleGA.h>
+#include <ga/GAStatistics.h>
 
 #include "BoundDiameterMinCutClustering.h"
 
@@ -65,9 +66,10 @@ GAPointLabelPlacement::~GAPointLabelPlacement() {
 
 ConflictGraph* GAPointLabelPlacement::conflictGraph = NULL;
 bool* GAPointLabelPlacement::mask = NULL;
-double GAPointLabelPlacement::initialSelectedGroupPortion = 0.60;
-double GAPointLabelPlacement::addedSelectedGroupPortion = 0.15;
-double GAPointLabelPlacement::selectedIndividualPortion = 0.20;
+double GAPointLabelPlacement::initialSelectedGroupPortion = 0.50;
+double GAPointLabelPlacement::addedSelectedGroupPortion = 0.20;
+double GAPointLabelPlacement::selectedIndividualPortion = 0.30;
+double GAPointLabelPlacement::addedSelectedIndividualPortion = 0.0;
 int GAPointLabelPlacement::alleleNumber = 0;
 int* GAPointLabelPlacement::alleleGroups = NULL;
 int* GAPointLabelPlacement::allelePointNumbers = NULL;
@@ -384,10 +386,53 @@ int** GAPointLabelPlacement::getSolutionRankedPartialAlleleGroupsAndIndividuals(
 		groupScoresOfP1.push_back(pair<int, double>(i, groupScoreP1));
 		groupScoresOfP2.push_back(pair<int, double>(i, groupScoreP2));
 	}
-	double selectedGroupPortion = (double) numberOfSelectedGroups
-			/ (double) numberOfGroups;
 	vector<int> nonGroupedAllelesP1;
 	vector<int> nonGroupedAllelesP2;
+
+	/*vector<pair<int, double>> selectedGroupScoresOfP1;
+	vector<pair<int, double>> selectedGroupScoresOfP2;
+	for(vector<pair<int, double>>::iterator it = groupScoresOfP1.begin(); it!= groupScoresOfP1.end(); it++) {
+		pair<int, double> groupScore = *it;
+		if(groupScore.second > 0.001*(double)alleleNumber) {
+			vector<int>* nonSelectedGroup = groups + groupScore.first;
+			for (int j = 0; j < nonSelectedGroup->size(); j++) {
+				int alleleNumber = nonSelectedGroup->at(j);
+				nonGroupedAllelesP1.push_back(alleleNumber);
+			}
+		} else {
+			selectedGroupScoresOfP1.push_back(groupScore);
+		}
+	}
+	for (vector<pair<int, double>>::iterator it = groupScoresOfP1.begin(); it!= groupScoresOfP1.end(); it++) {
+		int selectedGroupNumberP1 = it->first;
+		vector<int>* selectedGroup1 = groups + selectedGroupNumberP1;
+
+		for (int j = 0; j < selectedGroup1->size(); j++) {
+			int alleleNumber = selectedGroup1->at(j);
+			alleleGroups[0][alleleNumber] = selectedGroupNumberP1;
+		}
+	}
+	for(vector<pair<int, double>>::iterator it = groupScoresOfP2.begin(); it!= groupScoresOfP2.end(); it++) {
+		pair<int, double> groupScore = *it;
+		if(groupScore.second > 0.001*(double)alleleNumber) {
+			vector<int>* nonSelectedGroup = groups + groupScore.first;
+			for (int j = 0; j < nonSelectedGroup->size(); j++) {
+				int alleleNumber = nonSelectedGroup->at(j);
+				nonGroupedAllelesP2.push_back(alleleNumber);
+			}
+		}
+	}
+	for (vector<pair<int, double>>::iterator it = groupScoresOfP2.begin(); it!= groupScoresOfP2.end(); it++) {
+		int selectedGroupNumberP2 = it->first;
+		vector<int>* selectedGroup2 = groups + selectedGroupNumberP2;
+
+		for (int j = 0; j < selectedGroup2->size(); j++) {
+			int alleleNumber = selectedGroup2->at(j);
+			alleleGroups[1][alleleNumber] = selectedGroupNumberP2;
+		}
+	}*/
+	double selectedGroupPortion = (double) numberOfSelectedGroups
+			/ (double) numberOfGroups;
 	if (selectedGroupPortion < 0.5) {
 		partial_sort(groupScoresOfP1.begin(),
 				groupScoresOfP1.begin() + numberOfSelectedGroups,
@@ -472,26 +517,56 @@ int** GAPointLabelPlacement::getSolutionRankedPartialAlleleGroupsAndIndividuals(
 			}
 		}
 	}
-	int numberOfSelectedAlleles = selectedIndividualPortion * alleleNumber;
+
+
+	/*double numberOfSelectedAlleles = alleleNumber * (selectedIndividualPortion
+			+ addedSelectedIndividualPortion * (double) ga->generation()
+					/ (double) ga->nGenerations());
+
 	if(numberOfSelectedAlleles > nonGroupedAllelesP1.size()) {
 		numberOfSelectedAlleles = nonGroupedAllelesP1.size();
 	}
 
 	if(numberOfSelectedAlleles > nonGroupedAllelesP2.size()) {
 		numberOfSelectedAlleles = nonGroupedAllelesP2.size();
-	}
+	}*/
 
-	CompareVerticesAccToObjectivePart compareVerticesAccToObjectivePart;
+	int individualNumber = numberOfGroups;
+	/*CompareVerticesAccToObjectivePart compareVerticesAccToObjectivePart;
 	compareVerticesAccToObjectivePart.parent = &p1;
 	partial_sort(nonGroupedAllelesP1.begin(), nonGroupedAllelesP1.begin() + numberOfSelectedAlleles, nonGroupedAllelesP1.end(), compareVerticesAccToObjectivePart);
 	compareVerticesAccToObjectivePart.parent = &p2;
 	partial_sort(nonGroupedAllelesP2.begin(), nonGroupedAllelesP2.begin() + numberOfSelectedAlleles, nonGroupedAllelesP2.end(), compareVerticesAccToObjectivePart);
 
-	int individualNumber = numberOfGroups;
 	for(int i=0; i<numberOfSelectedAlleles; i++) {
 		int alleleNumber = nonGroupedAllelesP1[i];
 		alleleGroups[0][alleleNumber] = individualNumber;
 		alleleNumber = nonGroupedAllelesP2[i];
+		alleleGroups[1][alleleNumber] = individualNumber++;
+	}*/
+	vector<int> nonGroupedAllelesSelectedP1;
+	vector<int> nonGroupedAllelesSelectedP2;
+	double scoreLimit = alleleNumber * 0.000;
+	for(vector<int>::iterator it = nonGroupedAllelesP1.begin(); it!=nonGroupedAllelesP1.end(); it++) {
+		int allele = *it;
+		float alleleScore = scoreOfAnAllele(p1, allele);
+		if(alleleScore <= scoreLimit) {
+			nonGroupedAllelesSelectedP1.push_back(allele);
+		}
+	}
+	for(vector<int>::iterator it = nonGroupedAllelesSelectedP1.begin(); it!=nonGroupedAllelesSelectedP1.end(); it++) {
+		int alleleNumber = *it;
+		alleleGroups[0][alleleNumber] = individualNumber++;
+	}
+	for(vector<int>::iterator it = nonGroupedAllelesP2.begin(); it!=nonGroupedAllelesP2.end(); it++) {
+		int allele = *it;
+		float alleleScore = scoreOfAnAllele(p2, allele);
+		if(alleleScore <= scoreLimit) {
+			nonGroupedAllelesSelectedP2.push_back(allele);
+		}
+	}
+	for(vector<int>::iterator it = nonGroupedAllelesSelectedP2.begin(); it!=nonGroupedAllelesSelectedP2.end(); it++) {
+		int alleleNumber = *it;
 		alleleGroups[1][alleleNumber] = individualNumber++;
 	}
 	//cout<<"GAPointLabelPlacement::getRankedPartialAlleleGroups>end"<<endl;
@@ -842,13 +917,18 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph) {
 		populationSize++;
 	ga->populationSize(populationSize);
 	ga->minimaxi(GAGeneticAlgorithm::MINIMIZE);
-	ga->nGenerations(pointNumber);
+	ga->nGenerations(1*pointNumber);
 	ga->elitist(GABoolean::gaTrue);
 	ga->terminator(GAGeneticAlgorithm::TerminateUponGeneration);
+	ga->selectScores(GAStatistics::AllScores);
+	ga->scoreFilename(string("output3/scores_"+fileName+".txt").c_str());
+	ga->flushFrequency(pointNumber);
 	ga->evolve();
 
 	const GA1DArrayAlleleGenome<unsigned int> & bestIndividual =
 			(GA1DArrayAlleleGenome<unsigned int> &) ga->statistics().bestIndividual();
+	ga->statistics().write(string("output3/stats_"+fileName+".txt").c_str());
+	//ga->flushScores();
 	Solution* solution = new Solution(this->conflictGraph);
 	Solution& solutionRef = *solution;
 	int* labelPlacements = new int[pointNumber];

@@ -135,6 +135,7 @@ ConflictGraph* ConflictGraphLoader::load(string filePath) {
 			}
 		}
 	}
+	ifs.close();
 	edgeNumberOfPositionConflictGraph /= 2;
 	edgeNumberOfPointConflictGraph /= 2;
 

@@ -8,6 +8,7 @@
 #ifndef _POINTLABELINGGA_H_
 #define _POINTLABELINGGA_H_
 
+#include <string>
 #include <unordered_map>
 
 #include <ga/GA1DArrayGenome.h>
@@ -51,6 +52,7 @@ public:
 	static int uniformCrossoverWithSolutionRankedPartialGroupedAndIndividualMasking(const GAGenome&,
 			const GAGenome&, GAGenome*, GAGenome*);
 	Solution& optimize(ConflictGraph& conflictGraph);
+	std::string fileName;
 
 private:
 	static ConflictGraph* conflictGraph;
@@ -58,6 +60,7 @@ private:
 	static double initialSelectedGroupPortion;
 	static double addedSelectedGroupPortion;
 	static double selectedIndividualPortion;
+	static double addedSelectedIndividualPortion;
 	static int numberOfGroups;
 	static int numberOfSelectedGroups;
 	static std::vector<int>* groups;
