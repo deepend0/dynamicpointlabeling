@@ -10,7 +10,8 @@
 
 #include <vector>
 
-#include <Graph.h>
+#include "Graph.h"
+
 namespace labelplacement {
 
 using namespace graph;

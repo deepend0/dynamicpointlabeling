@@ -8,8 +8,8 @@
 #ifndef _CONFLICTGRAPHLOADER_H_
 #define _CONFLICTGRAPHLOADER_H_
 
-#include "ConflictGraph.h"
 #include <string>
+#include "ConflictGraph.h"
 
 namespace labelplacement {
 

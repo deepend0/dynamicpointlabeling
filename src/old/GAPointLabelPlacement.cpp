@@ -63,11 +63,13 @@ GAPointLabelPlacement::GAPointLabelPlacement() {
 
 GAPointLabelPlacement::~GAPointLabelPlacement() {
 }
+void NoInitializer(GAGenome & c){
+}
 
 ConflictGraph* GAPointLabelPlacement::conflictGraph = NULL;
 bool* GAPointLabelPlacement::mask = NULL;
-double GAPointLabelPlacement::initialSelectedGroupPortion = 0.50;
-double GAPointLabelPlacement::addedSelectedGroupPortion = 0.20;
+double GAPointLabelPlacement::initialSelectedGroupPortion = 0.00;
+double GAPointLabelPlacement::addedSelectedGroupPortion = 0.00;
 double GAPointLabelPlacement::selectedIndividualPortion = 0.30;
 double GAPointLabelPlacement::addedSelectedIndividualPortion = 0.0;
 int GAPointLabelPlacement::alleleNumber = 0;
@@ -79,6 +81,7 @@ vector<int>* GAPointLabelPlacement::groups = NULL;
 int GAPointLabelPlacement::lastGeneration = -1;
 int GAPointLabelPlacement::numberOfSelectedGroups = 0;
 GASimpleGA* GAPointLabelPlacement::ga = NULL;
+GAPopulation* GAPointLabelPlacement::lastPopulation = NULL;
 
 ConflictGraph* GAPointLabelPlacement::getConflictGraph() {
 	return conflictGraph;
@@ -132,6 +135,12 @@ void GAPointLabelPlacement::initialize(ConflictGraph& conflictGraph,
 			delete clusters->at(i);
 		}
 		delete clusters;
+	} else if(clusteringType == -1 ) {
+		numberOfGroups = 1;
+		groups = new vector<int> [numberOfGroups];
+		for(int i=0;i<alleleNumber; i++) {
+			groups[0].push_back(i);
+		}
 	}
 
 	CompareVertexGroupsByAvgIncidence compare;
@@ -887,7 +896,7 @@ int GAPointLabelPlacement::uniformCrossoverWithSolutionRankedPartialGroupedAndIn
 }
 Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph) {
 	GAPointLabelPlacement::conflictGraph = &conflictGraph;
-	initialize(conflictGraph, false, 0);
+	initialize(conflictGraph, false, -1);
 	int pointNumber =
 			conflictGraph.getConflictGraphOfPoints()->getVertexNumber();
 	int positionsPerPointNumber = conflictGraph.getPositionNumber();
@@ -898,7 +907,6 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph) {
 	GAAlleleSet<int> positionAlleleSet(positionsPerPointNumber, alleleSet);
 	GA1DArrayAlleleGenome<int> genome(pointNumber, positionAlleleSet, objective,
 	NULL);
-	genome.initializer(GA1DArrayAlleleGenome<int>::UniformInitializer);
 	//genome.crossover(GA1DArrayAlleleGenome<int>::UniformCrossover);
 	genome.crossover(
 			GAPointLabelPlacement::uniformCrossoverWithSolutionRankedPartialGroupedAndIndividualMasking);
@@ -917,14 +925,42 @@ Solution& GAPointLabelPlacement::optimize(ConflictGraph& conflictGraph) {
 		populationSize++;
 	ga->populationSize(populationSize);
 	ga->minimaxi(GAGeneticAlgorithm::MINIMIZE);
-	ga->nGenerations(1*pointNumber);
 	ga->elitist(GABoolean::gaTrue);
 	ga->terminator(GAGeneticAlgorithm::TerminateUponGeneration);
 	ga->selectScores(GAStatistics::AllScores);
 	ga->scoreFilename(string("output3/scores_"+fileName+".txt").c_str());
 	ga->flushFrequency(pointNumber);
+	if(lastPopulation != NULL) {
+		//cout<<"\tAve: "<<lastPopulation->ave()<<"\tDiv: "<<lastPopulation->div()<<"\tDev: "<<lastPopulation->dev();
+		//REPLACE WORST INDIVIDUALS
+		for(int i=0; i<0.00*pointNumber; i++) {
+			int randomIndividual = GARandomInt(0, pointNumber-1);
+			GA1DArrayAlleleGenome<int>* oldGenome = (GA1DArrayAlleleGenome<int>*) &lastPopulation->worst(i);
+			GA1DArrayAlleleGenome<int>* newGenome = new GA1DArrayAlleleGenome<int>(pointNumber, positionAlleleSet, objective,
+					NULL);
+			newGenome->crossover(
+					GAPointLabelPlacement::uniformCrossoverWithSolutionRankedPartialGroupedAndIndividualMasking);
+			for(int j=0; j<newGenome->size(); j++) {
+				newGenome->gene(j, newGenome->alleleset(j).allele());
+			}
+			lastPopulation->replace(newGenome, oldGenome);
+			//delete oldGenome;
+		}
+		for(int i=0; i<lastPopulation->size(); i++) {
+			lastPopulation->individual(i).initializer(NoInitializer);
+		}
+		lastPopulation->evaluate(GABoolean(true));
+		ga->population(*lastPopulation);
+		ga->nGenerations(0.033*pointNumber);
+		delete lastPopulation;
+	}
+	else
+	{
+		ga->nGenerations(0.33*pointNumber);
+		genome.initializer(GA1DArrayAlleleGenome<int>::UniformInitializer);
+	}
 	ga->evolve();
-
+	lastPopulation = new GAPopulation(ga->population());
 	const GA1DArrayAlleleGenome<unsigned int> & bestIndividual =
 			(GA1DArrayAlleleGenome<unsigned int> &) ga->statistics().bestIndividual();
 	ga->statistics().write(string("output3/stats_"+fileName+".txt").c_str());

@@ -5,6 +5,7 @@
  *      Author: oakile
  */
 
+
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
@@ -13,8 +14,8 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/regex_find_format.hpp>
 
-#include "ConflictGraphLoader.h"
 #include "ConflictGraph.h"
+#include "ConflictGraphLoader.h"
 #include "Graph.h"
 
 using namespace boost;

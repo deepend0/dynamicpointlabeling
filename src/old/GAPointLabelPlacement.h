@@ -53,6 +53,7 @@ public:
 			const GAGenome&, GAGenome*, GAGenome*);
 	Solution& optimize(ConflictGraph& conflictGraph);
 	std::string fileName;
+	static GAPopulation* lastPopulation;
 
 private:
 	static ConflictGraph* conflictGraph;
