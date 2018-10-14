@@ -16,6 +16,8 @@ class Solution {
 public:
 	Solution(ConflictGraph* conflictGraph);
 	virtual ~Solution();
+	ConflictGraph* getConflictGraph();
+	void setConflictGraph(ConflictGraph* conflictGraph);
 	int* getLabelPlacements();
 	void setLabelPlacements(int* labelPlacements);
 	int getConflictSize();

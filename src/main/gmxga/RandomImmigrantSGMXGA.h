@@ -14,8 +14,15 @@ namespace gmxga {
 
 class RandomImmigrantSGMXGA: public SimpleGMXGA {
 public:
+	static void NoGenomeInitializer(GAGenome& genome);
+
 	RandomImmigrantSGMXGA(const GAGenome& gaGenome);
+
 	virtual ~RandomImmigrantSGMXGA();
+
+	GAGenome* getGenomePrototype();
+
+	void setGenomePrototype(GAGenome* genome);
 
 	int getPeriod() const;
 
@@ -40,6 +47,7 @@ public:
 	virtual void evolve(unsigned int seed=0);
 
 private:
+	GAGenome* genomePrototype;
 	int period;
 	int numInitGen;
 	int numImmigrateGen;

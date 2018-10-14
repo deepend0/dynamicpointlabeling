@@ -27,13 +27,15 @@ struct GADPLPParameters {
 	int numImmigrateGen;
 	double immigrationRate;
 	int crossoverType;
+	double crossoverRate;
+	double mutationRate;
 	double groupProportion;
 	double groupProportionMargin;
 	double individualProportion;
 	double individualProportionMargin;
 	double individualScoreLimit;
 	GADPLPParameters();
-	GADPLPParameters(int numPoints, int numPositionsPerPoint, int populationSize, int selector,
+	GADPLPParameters(int numPoints, int numPositionsPerPoint, int populationSize, double crossoverRate, double mutationRate, int selector,
 			bool elitist, int period, int numInitGen, int numImmigrateGen, double immigrationRate,
 			int crossoverType, double groupProportion, double groupProportionMargin,
 			double individualProportion, double individualProportionMargin, double individualScoreLimit);

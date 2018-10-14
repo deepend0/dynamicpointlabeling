@@ -23,13 +23,6 @@ GroupMaskingCrossover::~GroupMaskingCrossover() {
 }
 
 void GroupMaskingCrossover::initialize(graph::Graph* graph) {
-	if(groups!=NULL){
-		for(vector<vector<int>*>::iterator it = groups->begin(); it!=groups->end(); it++) {
-			delete *it;
-		}
-		delete groups;
-	}
-	groups = grouper(graph);
 }
 
 void GroupMaskingCrossover::setGrouper(std::function<AlleleGrouper> grouper) {
@@ -39,6 +32,7 @@ void GroupMaskingCrossover::setGrouper(std::function<AlleleGrouper> grouper) {
 GMXDelegate::GMXDelegate(GroupMaskingCrossover* gmx) {
 	this->gmx=gmx;
 }
+
 int GMXDelegate::operator()(const GAGenome& p1, const GAGenome& p2, GAGenome* c1, GAGenome* c2) {
 	return (*gmx)(p1, p2, c1, c2);
 }
@@ -83,9 +77,18 @@ void UniformRankedGroupMaskingCrossover::setGA(GASimpleGA* ga) {
 }
 
 void UniformRankedGroupMaskingCrossover::initialize(graph::Graph* graph) {
+	if(groups!=NULL){
+		for(vector<vector<int>*>::iterator it = groups->begin(); it!=groups->end(); it++) {
+			delete *it;
+		}
+		delete groups;
+	}
+	if(groupProportion!=0 && groupProportionMargin!=0) {
+		groups = grouper(graph);
+		numberOfGroups = groups->size();
+	}
 	GroupMaskingCrossover::initialize(graph);
 	alleleNumber = graph->getVertices()->size();
-	numberOfGroups = groups->size();
 }
 
 int UniformRankedGroupMaskingCrossover::operator()(const GAGenome& p1, const GAGenome& p2, GAGenome* c1, GAGenome* c2) {
@@ -137,73 +140,78 @@ int* UniformRankedGroupMaskingCrossover::selectGroupsOfIndividual(const GA1DArra
 		alleleGroups[i] = -1;
 	}
 
-	vector<pair<int, double>> groupScores;
-	for (int i = 0; i < numberOfGroups; i++) {
-		vector<int>* group = groups->at(i);
-		double groupScore = 0;
-		for (int j = 0; j < group->size(); j++) {
-			int groupVertex = group->at(j);
-			groupScore += (*evaluator)(individual, groupVertex);
-		}
-		groupScore /= (double) group->size();
-
-		groupScores.push_back(pair<int, double>(i, groupScore));
-	}
-
 	vector<int> nonGroupedAlleles;
 
-	double selectedGroupPortion = (double) curNumberOfGroups
-			/ (double) numberOfGroups;
-
-	if (selectedGroupPortion < 0.5) {
-		partial_sort(groupScores.begin(),
-				groupScores.begin() + curNumberOfGroups,
-				groupScores.end(), ComparePairIntDoubleMin());
-		vector<pair<int, double>>::iterator itGroupScore = groupScores.begin();
-		for (int i = 0; i < curNumberOfGroups; i++) {
-			int selectedGroupNumber = (*itGroupScore++).first;
-			vector<int>* selectedGroup = groups->at(selectedGroupNumber);
-
-			for (int j = 0; j < selectedGroup->size(); j++) {
-				int alleleNumber = selectedGroup->at(j);
-					alleleGroups[alleleNumber] = selectedGroupNumber;
+	if(groups != NULL) {
+		vector<pair<int, double>> groupScores;
+		for (int i = 0; i < numberOfGroups; i++) {
+			vector<int>* group = groups->at(i);
+			double groupScore = 0;
+			for (int j = 0; j < group->size(); j++) {
+				int groupVertex = group->at(j);
+				groupScore += (*evaluator)(individual, groupVertex);
 			}
+			groupScore /= (double) group->size();
+
+			groupScores.push_back(pair<int, double>(i, groupScore));
 		}
-		for(int i = curNumberOfGroups; i < numberOfGroups; i++) {
-			int nonselectedGroupNumber = (*itGroupScore++).first;
-			vector<int>* nonselectedGroup = groups->at(nonselectedGroupNumber);
-			for (int j = 0; j < nonselectedGroup->size(); j++) {
-				int alleleNumber = nonselectedGroup->at(j);
-				nonGroupedAlleles.push_back(alleleNumber);
+
+		double selectedGroupPortion = (double) curNumberOfGroups
+				/ (double) numberOfGroups;
+
+		if (selectedGroupPortion < 0.5) {
+			partial_sort(groupScores.begin(),
+					groupScores.begin() + curNumberOfGroups,
+					groupScores.end(), ComparePairIntDoubleMin());
+			vector<pair<int, double>>::iterator itGroupScore = groupScores.begin();
+			for (int i = 0; i < curNumberOfGroups; i++) {
+				int selectedGroupNumber = (*itGroupScore++).first;
+				vector<int>* selectedGroup = groups->at(selectedGroupNumber);
+
+				for (int j = 0; j < selectedGroup->size(); j++) {
+					int alleleNumber = selectedGroup->at(j);
+						alleleGroups[alleleNumber] = selectedGroupNumber;
+				}
+			}
+			for(int i = curNumberOfGroups; i < numberOfGroups; i++) {
+				int nonselectedGroupNumber = (*itGroupScore++).first;
+				vector<int>* nonselectedGroup = groups->at(nonselectedGroupNumber);
+				for (int j = 0; j < nonselectedGroup->size(); j++) {
+					int alleleNumber = nonselectedGroup->at(j);
+					nonGroupedAlleles.push_back(alleleNumber);
+				}
+			}
+		} else {
+			int numberOfNonSelectedGroups = numberOfGroups - curNumberOfGroups;
+			partial_sort(groupScores.begin(),
+					groupScores.begin() + numberOfNonSelectedGroups,
+					groupScores.end(), ComparePairIntDoubleMax());
+
+			vector<pair<int, double>>::iterator itGroupScore = groupScores.end() - 1;
+			for (int i = 0; i < curNumberOfGroups; i++) {
+				int selectedGroupNumber = (*itGroupScore--).first;
+				vector<int>* selectedGroup = groups->at(selectedGroupNumber);
+
+				for (int j = 0; j < selectedGroup->size(); j++) {
+					int alleleNumber = selectedGroup->at(j);
+					alleleGroups[alleleNumber] = selectedGroupNumber;
+				}
+			}
+
+			for(int i = curNumberOfGroups; i < numberOfGroups; i++) {
+				int nonselectedGroupNumber = (*itGroupScore--).first;
+				vector<int>* nonselectedGroup = groups->at(nonselectedGroupNumber);
+				for (int j = 0; j < nonselectedGroup->size(); j++) {
+					int alleleNumber = nonselectedGroup->at(j);
+					nonGroupedAlleles.push_back(alleleNumber);
+				}
 			}
 		}
 	} else {
-		int numberOfNonSelectedGroups = numberOfGroups - curNumberOfGroups;
-		partial_sort(groupScores.begin(),
-				groupScores.begin() + numberOfNonSelectedGroups,
-				groupScores.end(), ComparePairIntDoubleMax());
-
-		vector<pair<int, double>>::iterator itGroupScore = groupScores.end() - 1;
-		for (int i = 0; i < curNumberOfGroups; i++) {
-			int selectedGroupNumber = (*itGroupScore--).first;
-			vector<int>* selectedGroup = groups->at(selectedGroupNumber);
-
-			for (int j = 0; j < selectedGroup->size(); j++) {
-				int alleleNumber = selectedGroup->at(j);
-				alleleGroups[alleleNumber] = selectedGroupNumber;
-			}
-		}
-
-		for(int i = curNumberOfGroups; i < numberOfGroups; i++) {
-			int nonselectedGroupNumber = (*itGroupScore--).first;
-			vector<int>* nonselectedGroup = groups->at(nonselectedGroupNumber);
-			for (int j = 0; j < nonselectedGroup->size(); j++) {
-				int alleleNumber = nonselectedGroup->at(j);
-				nonGroupedAlleles.push_back(alleleNumber);
-			}
+		for(int i=0;i<alleleNumber;i++) {
+			nonGroupedAlleles.push_back(i);
 		}
 	}
-
 	//Individual Selection Step
 	int individualNumber = curNumberOfGroups;
 	vector<int> nonGroupedAllelesSelected;

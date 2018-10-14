@@ -13,6 +13,8 @@ GADPLPParameters::GADPLPParameters(){
 	this->numPoints = 0;
 	this->numPositionsPerPoint = 0;
 	this->populationSize = 0;
+	this->crossoverRate = 0;
+	this->mutationRate = 0;
 	this->selector = 0;
 	this->elitist = 0;
 	this->period = 0;
@@ -27,13 +29,15 @@ GADPLPParameters::GADPLPParameters(){
 	this->individualScoreLimit = 0;
 }
 
-GADPLPParameters::GADPLPParameters(int numPoints, int numPositionsPerPoint, int populationSize, int selector,
+GADPLPParameters::GADPLPParameters(int numPoints, int numPositionsPerPoint, int populationSize, double crossoverRate, double mutationRate, int selector,
 		bool elitist, int period, int numInitGen, int numImmigrateGen, double immigrationRate,
 		int crossoverType, double groupProportion, double groupProportionMargin,
 		double individualProportion, double individualProportionMargin, double individualScoreLimit) {
 	this->numPoints = numPoints;
 	this->numPositionsPerPoint = numPositionsPerPoint;
 	this->populationSize = populationSize;
+	this->crossoverRate = crossoverRate;
+	this->mutationRate = mutationRate;
 	this->selector = selector;
 	this->elitist = elitist;
 	this->period = period;
@@ -68,7 +72,7 @@ float GADPLP::Objective::operator()(GAGenome & g) {
 	float conflictSize = 0;
 	int pointCount =
 			(*conflictGraph)->getConflictGraphOfPoints()->getVertexNumber();
-	int positionNumber = (*conflictGraph)->getPositionNumber();
+	int positionNumber = (*conflictGraph)->getPositionNumberPerPoint();
 	for (int i = 0; i < genome.length(); i++) {
 		int pointNumber = i;
 		int position1 = genome.gene(i);
@@ -103,7 +107,7 @@ GADPLP::AlleleEvaluator::AlleleEvaluator() {
 float GADPLP::AlleleEvaluator::operator()(const GA1DArrayGenome<int> & g, int i) {
 	int conflictSize = 0;
 	int position1 = g.gene(i);
-	int positionNumber = conflictGraph->getPositionNumber();
+	int positionNumber = conflictGraph->getPositionNumberPerPoint();
 	int posIx1 = i * positionNumber + position1;
 
 	std::vector<int>* conflictingPoints =
@@ -127,8 +131,10 @@ void GADPLP::init(GADPLPParameters& parameters) {
 	for (int i = 0; i < parameters.numPositionsPerPoint; i++)
 		alleleSetVals[i] = i;
 	GAAlleleSet<int> alleleSet(parameters.numPositionsPerPoint, alleleSetVals);
-	GA1DArrayAlleleGenome<int> genome(parameters.numPoints, alleleSet, objective, NULL);
-	ga = new gmxga::RandomImmigrantSGMXGA(genome);
+	GA1DArrayAlleleGenome<int>* genome = new GA1DArrayAlleleGenome<int>(parameters.numPoints, alleleSet, objective, NULL);
+	genome->initializer(GA1DArrayAlleleGenome<int>::UniformInitializer);
+	ga = new gmxga::RandomImmigrantSGMXGA(*genome);
+	ga->setGenomePrototype(genome);
 	ga->minimaxi(GAGeneticAlgorithm::MINIMIZE);
 
 	this->parameters = parameters;
@@ -156,14 +162,17 @@ void GADPLP::init(GADPLPParameters& parameters) {
 		crossover->setGrouper(BoundedDiameterMinCutClusterGrouper(1));
 		ga->setCrossover(crossover);
 	}
+	ga->set(gaNpCrossover, parameters.crossoverRate);
+	ga->set(gaNpMutation, parameters.mutationRate);
 }
 
 void GADPLP::updateProblem(labelplacement::ConflictGraph& conflictGraph) {
-	for(int i=0; i<ga->population().size(); i++) {
-		*objective.conflictGraph=&conflictGraph;
-		//Objective* objectiveOfIndividual = ga->population().individual(i).evaluator().target<Objective>();
-		//objectiveOfIndividual->conflictGraph = conflictGraph;
-	}
+	/*for(int i=0; i<ga->population().size(); i++) {
+		Objective* objectiveOfIndividual = ga->population().individual(i).evaluator().target<Objective>();
+		objectiveOfIndividual->conflictGraph = conflictGraph;
+	}*/
+
+	*objective.conflictGraph=&conflictGraph;
 	if(parameters.crossoverType==0) {
 		ga->getCrossover()->initialize(conflictGraph.getConflictGraphOfPoints());
 		GMXDelegate* gmxDelegate = ga->sexual().target<GMXDelegate>();

@@ -11,83 +11,104 @@
 
 #include "ConflictGraphLoader.h"
 #include "GADPLP.h"
+#include "GADPLPSimulation.h"
 #include "Solution.h"
 
-//Problem Sets
-std::string problemSetsPath = "/home/oakile/Workspace/DynamicPointLabeling/test/input_data/";
-const int numProblemsInSet6 = 5;
-std::string pathsProblemSet6 [numProblemsInSet6] = {
-	"dynamic_6/d100/",
-	"dynamic_6/d250/",
-	"dynamic_6/d500/",
-	"dynamic_6/d750/",
-	"dynamic_6/d1000/"
-};
-
-int numInstancesProblemSet6 = 25;
-int numPointsProblemSet6 [numProblemsInSet6] = {100, 250, 500, 750, 1000};
-int numPosPerPointProblemSet6 = 4;
-
-void runGADPLPForInstanceSet(std::string basePath, std::string instanceSetPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters);
-void runGADPLPForProblemsOfDifferentSize(double coefPop, double coefInitGen, double coefImmGen, double immRate, double groupProportion, double groupProportionMargin);
-void testImmigrationIsEffective(double coefPop, double coefInitGen, double coefImmGen, double immRate, double groupProportion, double groupProportionMargin);
+void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, DynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
+void runGADPLPFromFile(std::string problemPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters);
+void testDynamicConflictGraphGenerator();
 
 int main(int argc, char** argv) {
-	//GA Parameters
-	/*double coefPop=1;
-	double coefInitGen=0.33;
-	double coefImmGen=0.15;
-	double immRate=0.20;
-	double groupProportion=0.5;
-	double groupProportionMargin=0.2;*/
-	//runGADPLPForProblemsOfDifferentSize(coefPop, coefInitGen, coefImmGen, immRate, groupProportion, groupProportionMargin);
-	if(argc==8){
-		int testType=atoi(argv[1]);
-		if(testType==1 || testType==2) {
+	if(argc>0){
+		std::string testType=std::string(argv[1]);
+		if(testType=="fromfile" || testType=="withsimulation" || testType=="immigranttest") {
+			std::cout<<"Params";
+			for(int i=1; i<argc; i++){
+				std::cout<<" "<<argv[i];
+			}
+			std::cout<<std::endl;
 			double coefPop=atof(argv[2]);
-			double coefInitGen=atof(argv[3]);
-			double coefImmGen=atof(argv[4]);
-			double immRate=atof(argv[5]);
-			double groupProportion=atof(argv[6]);
-			double groupProportionMargin=atof(argv[7]);
-			std::cout<<"Params "<<coefPop<<" "<<coefInitGen<<" "<<coefImmGen<<" "<<immRate<<" "<<groupProportion<<" "<<groupProportionMargin<<std::endl;
-			if(testType==1){
-				runGADPLPForProblemsOfDifferentSize(coefPop, coefInitGen, coefImmGen, immRate, groupProportion, groupProportionMargin);
-			} else if(testType==2) {
-				testImmigrationIsEffective(coefPop, coefInitGen, coefImmGen, immRate, groupProportion, groupProportionMargin);
+			double crossoverRate = atof(argv[3]);
+			double mutationRate = atof(argv[4]);
+			double coefInitGen=atof(argv[5]);
+			double coefImmGen=atof(argv[6]);
+			double immRate=atof(argv[7]);
+			double groupProportion=atof(argv[8]);
+			double groupProportionMargin=atof(argv[9]);
+			int numPoints = atoi(argv[10]);
+			int numPositionsPerPoint = atoi(argv[11]);
+			if(testType=="fromfile"){
+				std::string problemPath = std::string(argv[12]);
+				int numInstances = atoi(argv[13]);
+
+				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, numInstances,
+						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
+				int instanceNumbers [numInstances];
+				for(int j=0; j<numInstances; j++) {
+					instanceNumbers[j]=j+1;
+				}
+				runGADPLPFromFile(problemPath, numInstances, instanceNumbers, gadplpParameters);
+			} else if(testType=="withsimulation") {
+				int areaWidth = atoi(argv[12]);
+				int areaHeight = atoi(argv[13]);
+				int labelWidth = atoi(argv[14]);
+				int labelHeight = atoi(argv[15]);
+				int problemUpdatePeriod = atoi(argv[16]);
+				int optimizationPeriod = atoi(argv[17]);
+				int numberOfPeriods = atoi(argv[18]);
+
+				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, optimizationPeriod,
+						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
+				DynamicConflictGraphGeneratorParameters cggParameters(areaWidth, areaHeight, numPoints, numPositionsPerPoint, labelWidth, labelHeight);
+				GADPLPSimulationParameters simulationParameters(problemUpdatePeriod, optimizationPeriod, numberOfPeriods);
+				runGADPLPWithSimulation(gadplpParameters, cggParameters, simulationParameters);
+			} else if(testType=="immigranttest") {
+				std::string problemPath = std::string(argv[12]);
+				int numInstances = atoi(argv[13]);
+
+				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, numInstances,
+						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
+				int instanceNumbers [numInstances];
+				for(int j=0; j<numInstances; j++) {
+					instanceNumbers[j]=1;
+				}
+				runGADPLPFromFile(problemPath, numInstances, instanceNumbers, gadplpParameters);
 			} else {
 				std::cout<<"Unidentified type of test!"<<std::endl;
 			}
+		} else if(testType=="cggtest") {
+			testDynamicConflictGraphGenerator();
 		}
 	} else {
-		std::cout<<"Wrong parameters!"<<std::endl;
+		std::cout<<"Enter test type"<<std::endl;
 	}
 }
 
-void runGADPLPForProblemsOfDifferentSize(double coefPop, double coefInitGen, double coefImmGen, double immRate, double groupProportion, double groupProportionMargin) {
-	for(int i=0; i<numProblemsInSet6; i++)
-	{
-		GADPLP::GADPLPParameters parameters(numPointsProblemSet6[i], numPosPerPointProblemSet6, coefPop*numPointsProblemSet6[i], 0, true, numInstancesProblemSet6,
-				coefInitGen*numPointsProblemSet6[i], coefImmGen*numPointsProblemSet6[i], immRate,
-			0, groupProportion, groupProportionMargin,
-			0, 0, 0);
-		int instanceNumbers [numInstancesProblemSet6];
-		for(int j=0; j<numInstancesProblemSet6; j++) {
-			instanceNumbers[j]=j+1;
-		}
-		runGADPLPForInstanceSet(problemSetsPath, pathsProblemSet6[i], numInstancesProblemSet6, instanceNumbers, parameters);
+void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, DynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
+	GADPLPSimulation gadplpSimulation(gadplpParameters, cggParameters, simulationParameters);
+	std::vector<GADPLPSimulation::SolutionContext>* solutions = gadplpSimulation.runSimulation();
+	for(std::vector<GADPLPSimulation::SolutionContext>::iterator it = solutions->begin(); it!=solutions->end(); it++) {
+		GADPLPSimulation::SolutionContext solutionCtx = *it;
+		int conflictsForSourceProblem = solutionCtx.solution->getConflictSize();
+		solutionCtx.solution->setConflictGraph(solutionCtx.targetPrb);
+		int conflictsForTargetProblem = solutionCtx.solution->getConflictSize();
+		std::cout<<"OT: "<<solutionCtx.optimizationTime<<" CSP:"<<conflictsForSourceProblem<<" CTP:"<<conflictsForTargetProblem<<std::endl;
+		delete solutionCtx.sourcePrb;
+		delete solutionCtx.targetPrb;
+		delete solutionCtx.solution;
 	}
+	delete solutions;
 }
 
-void runGADPLPForInstanceSet(std::string basePath, std::string instanceSetPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters){
+void runGADPLPFromFile(std::string problemPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters){
 	labelplacement::ConflictGraphLoader cgl;
 	GADPLP::GADPLP gadplp;
 	gadplp.init(gaplpParameters);
 	for(int i=0; i<numInstances; i++) {
 		int instanceNumber = instanceNumbers[i];
 		std::string filename = (instanceNumber < 10 ? "0" : "") + std::to_string(instanceNumber) + ".dat";
-		std::cout << "I: " << instanceSetPath + filename;
-		std::string instanceFullPath = basePath + instanceSetPath + filename;
+		std::cout << "I: " << problemPath + filename;
+		std::string instanceFullPath = problemPath + filename;
 		labelplacement::ConflictGraph* cg = cgl.load(instanceFullPath);
 		clock_t startG = clock();
 		labelplacement::Solution& solution = gadplp.optimize(*cg);
@@ -100,18 +121,11 @@ void runGADPLPForInstanceSet(std::string basePath, std::string instanceSetPath, 
 	}
 }
 
-void testImmigrationIsEffective(double coefPop, double coefInitGen, double coefImmGen, double immRate, double groupProportion, double groupProportionMargin) {
-
-	for(int i=0; i<numProblemsInSet6; i++)
-	{
-		GADPLP::GADPLPParameters parameters(numPointsProblemSet6[i], numPosPerPointProblemSet6, coefPop*numPointsProblemSet6[i], 0, true, numInstancesProblemSet6,
-				coefInitGen*numPointsProblemSet6[i], coefImmGen*numPointsProblemSet6[i], immRate,
-			0, groupProportion, groupProportionMargin,
-			0, 0, 0);
-		int instanceNumbers [numInstancesProblemSet6];
-		for(int j=0; j<10; j++) {
-			instanceNumbers[j]=1;
-		}
-		runGADPLPForInstanceSet(problemSetsPath, pathsProblemSet6[i], 10, instanceNumbers, parameters);
+void testDynamicConflictGraphGenerator() {
+	DynamicConflictGraphGeneratorParameters params(800, 600, 100, 4, 20, 5);
+	DynamicConflictGraphGenerator cgg(params);
+	for(int i=0;i<10;i++) {
+		std::cout<<i<<std::endl;
+		cgg.generate(1);
 	}
 }

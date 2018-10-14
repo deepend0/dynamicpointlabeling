@@ -18,6 +18,13 @@ Solution::~Solution() {
 	delete[] labelPlacements;
 }
 
+ConflictGraph* Solution::getConflictGraph() {
+	return this->conflictGraph;
+}
+void Solution::setConflictGraph(ConflictGraph* conflictGraph) {
+	this->conflictGraph = conflictGraph;
+}
+
 int* Solution::getLabelPlacements() {
 	return this->labelPlacements;
 }
@@ -31,12 +38,12 @@ int Solution::getConflictSize() {
 			i < conflictGraph->getConflictGraphOfPoints()->getVertexNumber();
 			i++) {
 		int position1 = labelPlacements[i];
-		int posIx1 = i * conflictGraph->getPositionNumber() + position1;
+		int posIx1 = i * conflictGraph->getPositionNumberPerPoint() + position1;
 		for (int j = 0;
 				j < conflictGraph->getConflictGraphOfPoints()->getVertexNumber();
 				j++) {
 			int position2 = labelPlacements[j];
-			int posIx2 = j * conflictGraph->getPositionNumber() + position2;
+			int posIx2 = j * conflictGraph->getPositionNumberPerPoint() + position2;
 			if (conflictGraph->getConflictGraphOfPositions()->getAdjacencyMatrix()[posIx1][posIx2]) {
 				conflictSize++;
 				break;

@@ -18,19 +18,21 @@ using namespace graph;
 
 class ConflictGraph {
 public:
+	ConflictGraph(int positionNumberPerPoint, int numberOfPositions, std::vector<int>* adjacencyListOfPositions);
 	ConflictGraph();
 	virtual ~ConflictGraph();
 	Graph* getConflictGraphOfPoints() const;
 	void setConflictGraphOfPoints(Graph* conflictGraphOfPoints);
 	Graph* getConflictGraphOfPositions() const;
 	void setConflictGraphOfPositions(Graph* conflictGraphOfPositions);
-	int getPositionNumber() const;
-	void setPositionNumber(int positionNumber);
+	int getPositionNumberPerPoint() const;
+	void setPositionNumberPerPoint(int positionNumberPerPoint);
+	void initializeOf(int positionNumberPerPoint, int numberOfPositions, std::vector<int>* adjacencyListOfPositions);
 
 private:
 	Graph* conflictGraphOfPoints;
 	Graph* conflictGraphOfPositions;
-	int positionNumber;
+	int positionNumberPerPoint;
 };
 
 } /* namespace labelplacement */
