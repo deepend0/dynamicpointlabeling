@@ -17,14 +17,38 @@ class MovingPoint;
 class MovingPointsGenerator
 {
 	public:
+		struct ParametersCoef {
+			int areaWidth;
+			int areaHeight;
+			int numPoints;
+			double meanSpdCoef;
+			double stdSpdCoef;
+			double maxSpdCoef;
+			double meanDirDivergence;
+			double stdDirCoef;
+			double maxDirDivergence;
+		};
+
+		struct Parameters {
+			int areaWidth;
+			int areaHeight;
+			int numPoints;
+			double meanSpd;
+			double stdSpd;
+			double maxSpd;
+			double meanDir;
+			double stdDir;
+			double maxDir;
+		};
+
 		static const double pi;
-		MovingPointsGenerator();
 		MovingPointsGenerator(int areaWidth, int areaHeight, int numPoints);
+		MovingPointsGenerator(ParametersCoef& parameters);
+		MovingPointsGenerator(Parameters& parameters);
 		
 		int areaWidth;
 		int areaHeight;
 		int numPoints;
-		
 		double maxSpd;
 		double meanSpd;
 		double stdSpd;
@@ -33,6 +57,8 @@ class MovingPointsGenerator
 		double stdDir;
 		
 		std::vector<MovingPoint*>* generate();
+	private:
+		void calculateMovementParameters(ParametersCoef parameters);
 };
 
 class MovingPoint

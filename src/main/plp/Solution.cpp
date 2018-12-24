@@ -33,6 +33,10 @@ void Solution::setLabelPlacements(int* labelPlacements) {
 }
 
 int Solution::getConflictSize() {
+	return getConflictSize(this->conflictGraph);
+}
+
+int Solution::getConflictSize(ConflictGraph* conflictGraph) {
 	int conflictSize = 0;
 	for (int i = 0;
 			i < conflictGraph->getConflictGraphOfPoints()->getVertexNumber();

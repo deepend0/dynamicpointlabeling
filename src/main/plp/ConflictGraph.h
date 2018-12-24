@@ -8,6 +8,7 @@
 #ifndef _CONFLICTGRAPH_H_
 #define _CONFLICTGRAPH_H_
 
+#include <string>
 #include <vector>
 
 #include "Graph.h"
@@ -18,8 +19,11 @@ using namespace graph;
 
 class ConflictGraph {
 public:
+	static void writeConflictGraphIntoFile(std::vector<int>* adjacencyListOfPositions, int pointSize, int positionsPerPoint, std::string filename);
+
 	ConflictGraph(int positionNumberPerPoint, int numberOfPositions, std::vector<int>* adjacencyListOfPositions);
 	ConflictGraph();
+	static int compareConflictGraphs(int size, std::vector<int>* cg1, std::vector<int>* cg2);
 	virtual ~ConflictGraph();
 	Graph* getConflictGraphOfPoints() const;
 	void setConflictGraphOfPoints(Graph* conflictGraphOfPoints);
@@ -37,4 +41,4 @@ private:
 
 } /* namespace labelplacement */
 
-#endif /* SRC_CONFLICTGRAPH_H_ */
+#endif /* _CONFLICTGRAPH_H_ */

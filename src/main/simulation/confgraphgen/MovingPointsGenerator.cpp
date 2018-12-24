@@ -14,33 +14,63 @@ Position::Position(int x, int y)
 	this->y = y;
 }
 
-MovingPointsGenerator::MovingPointsGenerator()
-{
-}
-
 MovingPointsGenerator::MovingPointsGenerator(int areaWidth, int areaHeight, int numPoints)
 {
+
+	double diagonalLength = sqrt(areaWidth*areaWidth + areaHeight*areaHeight);
+	double diagonalAngle =  acos((double)areaHeight/diagonalLength);
 	this->areaWidth = areaWidth;
 	this->areaHeight = areaHeight;
 	this->numPoints = numPoints;
+	this->meanSpd = 4;
+	this->stdSpd = 0.33;
+	this->maxSpd = 5.5;
+	this->meanDir = diagonalAngle;
+	this->stdDir = pi/180;
+	this->maxDir = diagonalAngle+3*this->stdDir;
+
+	/*ParametersCoef parameters;
+	parameters.areaWidth = areaWidth;
+	parameters.areaHeight = areaHeight;
+	parameters.numPoints = numPoints;
+	parameters.meanSpdCoef = 0.001;
+	parameters.stdSpdCoef = 0.01;
+	parameters.maxSpdCoef = 2;
+	parameters.meanDirDivergence = 0;
+	parameters.stdDirCoef = pi/180;
+	parameters.maxDirDivergence = pi/4;
+	calculateMovementParameters(parameters);*/
+
 }
+
+MovingPointsGenerator::MovingPointsGenerator(ParametersCoef& parameters)
+{
+	this->areaWidth = parameters.areaWidth;
+	this->areaHeight = parameters.areaHeight;
+	this->numPoints = parameters.numPoints;
+	calculateMovementParameters(parameters);
+}
+
+
+MovingPointsGenerator::MovingPointsGenerator(Parameters& parameters)
+{
+	this->areaWidth = parameters.areaWidth;
+	this->areaHeight = parameters.areaHeight;
+	this->numPoints = parameters.numPoints;
+	this->meanSpd = parameters.meanSpd;
+	this->stdSpd = parameters.stdSpd;
+	this->maxSpd = parameters.maxSpd;
+	this->meanDir = parameters.meanDir;
+	this->stdDir = parameters.stdDir;
+	this->maxDir = parameters.maxDir;
+}
+
 
 std::vector<MovingPoint*>* MovingPointsGenerator::generate()
 {
-
-	double diagonLength = sqrt(areaWidth*areaWidth + areaHeight*areaHeight);
-	meanSpd = diagonLength/100;
-	stdSpd = meanSpd/100;
-	maxSpd = meanSpd*2;
-
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_real_distribution<double> freqDist(0.0, 1.0);
-	std::uniform_real_distribution<double> cosDist(-1.0, 1.0);
-
-	meanDir = acos((double)cosDist(gen));
-	stdDir = meanDir/200;
-	maxDir = 2*pi;
 
 	std::uniform_int_distribution<> posWidthDist(0, areaWidth);
 	std::uniform_int_distribution<> posHeightDist(0, areaHeight);
@@ -74,6 +104,19 @@ std::vector<MovingPoint*>* MovingPointsGenerator::generate()
 	return movingPoints;
 }
 
+void MovingPointsGenerator::calculateMovementParameters(ParametersCoef parameters) {
+	double diagonLength = sqrt(parameters.areaWidth*parameters.areaWidth + parameters.areaHeight*parameters.areaHeight);
+	this->meanSpd = diagonLength*parameters.meanSpdCoef;
+	this->stdSpd = meanSpd*parameters.stdSpdCoef;
+	this->maxSpd = meanSpd*parameters.maxSpdCoef;
+
+
+	double diagonDir =  acos((double)parameters.areaHeight/diagonLength);
+	meanDir = diagonDir+parameters.meanDirDivergence;
+	stdDir = parameters.stdDirCoef;
+	maxDir = diagonDir + parameters.maxDirDivergence;
+}
+
 MovingPoint::MovingPoint() : position(0,0)
 {
 }
@@ -81,8 +124,8 @@ MovingPoint::MovingPoint() : position(0,0)
 void MovingPoint::updatePosition()
 {
 	meanAcc = 0;
-	stdAcc = speed/100;
-	maxAcc = speed/20;
+	stdAcc = 0;
+	maxAcc = 0;
 	meanDirChg = 0;
 	stdDirChg = MovingPointsGenerator::pi/360;
 

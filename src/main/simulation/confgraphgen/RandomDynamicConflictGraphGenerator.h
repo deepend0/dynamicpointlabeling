@@ -1,18 +1,19 @@
 /*
- * DynamicConflictGraphGenerator.h
+ * RandomDynamicConflictGraphGenerator.h
  *
  *  Created on: May 26, 2018
  *      Author: oakile
  */
 
-#ifndef _DYNAMICCONFLICTGRAPHGENERATOR_H_
-#define _DYNAMICCONFLICTGRAPHGENERATOR_H_
+#ifndef _RANDOMDYNAMICCONFLICTGRAPHGENERATOR_H_
+#define _RANDOMDYNAMICCONFLICTGRAPHGENERATOR_H_
 
 #include <string>
 #include <vector>
 
-#include "MovingPointsGenerator.h"
 #include "ConflictGraph.h"
+#include "ConflictGraphGenerator.h"
+#include "MovingPointsGenerator.h"
 
 class Rectangle {
 public:
@@ -25,32 +26,37 @@ public:
 
 	void print();
 };
-struct DynamicConflictGraphGeneratorParameters {
-	DynamicConflictGraphGeneratorParameters(int areaWidth, int areaHeight, int numberOfPoints, int positionsPerPoint,
+struct RandomDynamicConflictGraphGeneratorParameters {
+	RandomDynamicConflictGraphGeneratorParameters(int areaWidth, int areaHeight, int numberOfPoints, int positionsPerPoint,
 			int labelWidth, int labelHeight);
+	~RandomDynamicConflictGraphGeneratorParameters();
 	int areaWidth;
 	int areaHeight;
 	int numberOfPoints;
 	int labelWidth;
 	int labelHeight;
 	int positionsPerPoint;
+	bool mpParamsIndicator = false;
+	double maxSpd;
+	double meanSpd;
+	double stdSpd;
+	double maxDir;
+	double meanDir;
+	double stdDir;
 };
-class DynamicConflictGraphGenerator {
+class RandomDynamicConflictGraphGenerator : public ConflictGraphGenerator {
 public:
-	DynamicConflictGraphGenerator();
-	DynamicConflictGraphGenerator(DynamicConflictGraphGeneratorParameters parameters);
-	virtual ~DynamicConflictGraphGenerator();
+	RandomDynamicConflictGraphGenerator(RandomDynamicConflictGraphGeneratorParameters parameters);
+	virtual ~RandomDynamicConflictGraphGenerator();
 	virtual labelplacement::ConflictGraph* generate(int forwardStates);
 private:
 	labelplacement::ConflictGraph* generateConflictGraph(std::vector<MovingPoint*>* movingPoints);
 	bool intersectionOccurs(Rectangle& r1, Rectangle& r2);
-	int compareConflictGraphs(int size, std::vector<int>* cg1, std::vector<int>* cg2);
-	void writeConflictGraphIntoFile(std::vector<int>* adjacencyListOfPositions, int pointSize, std::string filename);
 	int labelWidth;
 	int labelHeight;
 	int positionsPerPoint;
-	MovingPointsGenerator mpGen;
+	MovingPointsGenerator* mpGen;
 	std::vector<MovingPoint*>* movingPoints;
 };
 
-#endif /* _DYNAMICCONFLICTGRAPHGENERATOR_H_ */
+#endif /* _RANDOMDYNAMICCONFLICTGRAPHGENERATOR_H_ */

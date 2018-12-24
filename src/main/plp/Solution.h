@@ -21,6 +21,7 @@ public:
 	int* getLabelPlacements();
 	void setLabelPlacements(int* labelPlacements);
 	int getConflictSize();
+	int getConflictSize(ConflictGraph* conflictGraph);
 private:
 	ConflictGraph* conflictGraph;
 	int* labelPlacements;

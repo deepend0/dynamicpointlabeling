@@ -8,14 +8,16 @@
 #ifndef _SIMULATION_GADPLPSIMULATION_H_
 #define _SIMULATION_GADPLPSIMULATION_H_
 
-#include "DynamicConflictGraphGenerator.h"
 #include "GADPLP.h"
 #include "Solution.h"
 
+#include <functional>
 #include <vector>
+#include "ConflictGraphGenerator.h"
 
 struct GADPLPSimulationParameters {
-	GADPLPSimulationParameters(int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods);
+	GADPLPSimulationParameters(int mode, int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods);
+	int mode;
 	int problemUpdatePeriod;
 	int optimizationPeriod;
 	int numberOfPeriods;
@@ -24,21 +26,25 @@ class GADPLPSimulation {
 private:
 
 public:
-	struct SolutionContext {
-		SolutionContext(labelplacement::ConflictGraph* sourcePrb, labelplacement::ConflictGraph* targetPrb, labelplacement::Solution* solution, int optimizationTime);
-		~SolutionContext();
-		labelplacement::ConflictGraph* sourcePrb = NULL;
-		labelplacement::ConflictGraph* targetPrb = NULL;
-		labelplacement::Solution* solution = NULL;
-		int optimizationTime = 0;
+	struct GADPLPSimulationPeriodNotification {
+		GADPLPSimulationPeriodNotification();
+		~GADPLPSimulationPeriodNotification();
+		labelplacement::ConflictGraph* conflictGraph = NULL;
+		int conflictGraphChange = -1;
+		std::vector<labelplacement::Solution*>* solutions = NULL;
+		int periodStartTime = 0;
+		int periodEndTime = 0;
+		bool optimizationOccured=false;
+		std::vector<int>* solutionTimes = NULL;
 	};
-	GADPLPSimulation(DynamicConflictGraphGenerator* confgraphgen, GADPLP::GADPLP* gadplp, GADPLPSimulationParameters parameters);
-	GADPLPSimulation(GADPLP::GADPLPParameters& gadplpParameters, DynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
+
+	GADPLPSimulation(ConflictGraphGenerator* confgraphgen, GADPLP::GADPLP* gadplp, GADPLPSimulationParameters parameters);
 	virtual ~GADPLPSimulation();
-	std::vector<SolutionContext>* runSimulation();
+	void runSimulation(std::function<void(GADPLPSimulationPeriodNotification*)>& simulationObserver);
 private:
-	DynamicConflictGraphGenerator* confgraphgen;
+	ConflictGraphGenerator* confgraphgen;
 	GADPLP::GADPLP* gadplp;
+	int mode;
 	int problemUpdatePeriod;
 	int optimizationPeriod;
 	int numberOfPeriods;

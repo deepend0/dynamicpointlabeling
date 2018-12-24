@@ -72,7 +72,7 @@ int RandomImmigrantSGMXGA::nGenerations(unsigned int n) {
 void RandomImmigrantSGMXGA::initialize(unsigned int seed)
 {
 	//std::cout<<"STAGE: "<<curStage<<"/"<<period<<" ";
-	if(curStage % period == 0) {
+	if(curStage % period == 0 || immigrationRate==1.0) {
 		for(int i=0;i<pop->size(); i++) {
 			pop->individual(i).initializer(genomePrototype->initializer());
 		}
@@ -84,13 +84,9 @@ void RandomImmigrantSGMXGA::initialize(unsigned int seed)
 
 		for(int i=0; i<numGenomesToReplace; i++) {
 			GA1DArrayAlleleGenome<int>* oldGenome = (GA1DArrayAlleleGenome<int>*) &pop->worst(i);
-			GA1DArrayAlleleGenome<int>* newGenome = new GA1DArrayAlleleGenome<int>(oldGenome->size(), oldGenome->alleleset(), oldGenome->evaluator(),
-					NULL);
-			newGenome->crossover(oldGenome->sexual());
-			newGenome->initializer(genomePrototype->initializer());
-			newGenome->initialize();
-			newGenome->initializer(NoGenomeInitializer);
-			pop->replace(newGenome, oldGenome);
+			oldGenome->initializer(genomePrototype->initializer());
+			oldGenome->initialize();
+			oldGenome->initializer(NoGenomeInitializer);
 		}
 
 		if(curStage % period == 1) {
