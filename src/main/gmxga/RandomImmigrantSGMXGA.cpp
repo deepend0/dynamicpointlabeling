@@ -6,6 +6,7 @@
  */
 
 #include <iostream>
+#include <vector>
 #include "RandomImmigrantSGMXGA.h"
 
 namespace gmxga {
@@ -82,14 +83,19 @@ void RandomImmigrantSGMXGA::initialize(unsigned int seed)
 		int populationSize = pop->size();
 		int numGenomesToReplace = immigrationRate*populationSize;
 
+		pop->worst(0);
+		std::vector<GA1DArrayAlleleGenome<int>*> worstGenomes;
 		for(int i=0; i<numGenomesToReplace; i++) {
-			GA1DArrayAlleleGenome<int>* oldGenome = (GA1DArrayAlleleGenome<int>*) &pop->worst(i);
-			oldGenome->initializer(genomePrototype->initializer());
-			oldGenome->initialize();
-			oldGenome->initializer(NoGenomeInitializer);
+			worstGenomes.push_back((GA1DArrayAlleleGenome<int>*)&pop->individual(populationSize-1-i));
+		}
+		for(int i=0; i<numGenomesToReplace; i++) {
+			GA1DArrayAlleleGenome<int>* oldGenome = worstGenomes.at(i);
+			for(int j=0; j<oldGenome->length(); j++) {
+				oldGenome->gene(j, GARandomInt(0, oldGenome->alleleset().size()-1));
+			}
 		}
 
-		if(curStage % period == 1) {
+		if(curStage % period != 0) {
 			for(int i=0;i<pop->size(); i++) {
 				pop->individual(i).initializer(NoGenomeInitializer);
 			}
@@ -99,6 +105,27 @@ void RandomImmigrantSGMXGA::initialize(unsigned int seed)
 	SimpleGMXGA::initialize(seed);
 }
 
+void RandomImmigrantSGMXGA::step() {
+	GASimpleGA::step();
+	/*
+	//REPLACE WORST INDIVIDUALS
+	int populationSize = pop->size();
+	int numGenomesToReplace = immigrationRate*populationSize;
+
+	pop->worst(0);
+	std::vector<GA1DArrayAlleleGenome<int>*> worstGenomes;
+	for(int i=0; i<numGenomesToReplace; i++) {
+		worstGenomes.push_back((GA1DArrayAlleleGenome<int>*)&pop->individual(populationSize-1-i));
+	}
+	for(int i=0; i<numGenomesToReplace; i++) {
+		GA1DArrayAlleleGenome<int>* oldGenome = worstGenomes.at(i);
+		for(int j=0; j<oldGenome->length(); j++) {
+			oldGenome->gene(j, GARandomInt(0, oldGenome->alleleset().size()-1));
+		}
+	}
+	stats.update(*pop);
+	*/
+}
 void RandomImmigrantSGMXGA::evolve(unsigned int seed){
 	GASimpleGA::evolve(seed);
 	curStage++;

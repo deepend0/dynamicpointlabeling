@@ -6,22 +6,26 @@
  */
 
 #include <cstdlib>
+#include <cmath>
 #include <fstream>
 #include <string>
 #include <vector>
 
 #include "ConflictGraphLoader.h"
-#include "GADPLP.h"
-#include "GADPLPSimulation.h"
 #include "ConflictGraphGenerator.h"
 #include "PresentFileSetDCGG.h"
 #include "RandomDynamicConflictGraphGenerator.h"
 #include "Solution.h"
+#include "GADPLP.h"
+#include "GADPLPSimulation.h"
+#include "FHPLPOptimizerAdaptor.h"
+#include "fhplp/FastHeuristicPLP.hpp"
 
-void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, RandomDynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
-void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
-void runGADPLPWithSimulation(GADPLP::GADPLP* gadplp, ConflictGraphGenerator* cgg, GADPLPSimulationParameters& simulationParameters);
+void runGADPLPSimulation(GADPLP::GADPLPParameters& gadplpParameters, RandomDynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
+void runGADPLPSimulation(GADPLP::GADPLPParameters& gadplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
+void runDPLPSimulation(std::function<GADPLPSimulation::Optimizer> optimizer, ConflictGraphGenerator* cgg, GADPLPSimulationParameters& simulationParameters, labelplacement::Solution* initialSolution);
 void runGADPLPFromFile(std::string problemPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters);
+void runFHPLPSimulation(fhplp::FastHeuristicPLPParameters& fhplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters);
 void generateConflictGraphToFile(RandomDynamicConflictGraphGeneratorParameters& cggParameters, std::string outputPath, int numStates);
 void testDynamicConflictGraphGenerator();
 
@@ -39,10 +43,13 @@ struct ConflictSizeSimulationObserver {
 	labelplacement::ConflictGraph* lastConflictGraph = NULL;
 	bool lastConflictGraphFree = false;
 	double averageConflictSize=0;
+	double averageConflictSizeToFirstTarget=0;
 	double totalTime=0;
 	int currentPeriod=0;
 	double averageConflictSizeToSource=0;
 	double averageConflictGraphChange=0;
+	std::vector<int> conflictGraphSizes;
+	std::vector<int> conflictGraphChanges;
 	int numSolutions=0;
 	std::vector<int> solutionTimes;
 	void operator()(GADPLPSimulation::GADPLPSimulationPeriodNotification* periodNotification) {
@@ -57,23 +64,16 @@ struct ConflictSizeSimulationObserver {
 		std::cout<<"CONFLICTS ALL: "<<periodNotification->conflictGraph->getConflictGraphOfPositions()->getEdgeNumber()<<"\tCHG: "<<periodNotification->conflictGraphChange<<std::endl;
 		if(periodNotification->conflictGraphChange!=-1) {
 			averageConflictGraphChange=(averageConflictGraphChange*(currentPeriod-2) + (double)periodNotification->conflictGraphChange/(double)periodNotification->conflictGraph->getConflictGraphOfPositions()->getEdgeNumber())/(currentPeriod-1);
+			conflictGraphSizes.push_back(periodNotification->conflictGraph->getConflictGraphOfPositions()->getEdgeNumber());
+			conflictGraphChanges.push_back(periodNotification->conflictGraphChange);
 		}
 		std::vector<int*>* solutionIntervals = new std::vector<int*>();
 		int* lastSolutionInterval = NULL;
 
 		for(int i=0; i<periodNotification->solutions->size(); i++) {
+
 			labelplacement::Solution* solution = periodNotification->solutions->at(i);
 			int solutionTime = periodNotification->solutionTimes->at(i);
-			if(lastSolution!=solution) {
-				if(lastSolution!=NULL){
-					if(lastSolution->getConflictGraph()!=solution->getConflictGraph()){
-						delete lastSolution->getConflictGraph();
-					}
-					delete lastSolution;
-				}
-				lastSolution = solution;
-				solutionTimes.push_back(solutionTime);
-			}
 			if(i!=0){
 				lastSolutionInterval[1]=solutionTime-1;
 			}
@@ -91,11 +91,28 @@ struct ConflictSizeSimulationObserver {
 				lastSolutionInterval[2]=-1;
 				lastSolutionInterval[3]=-1;
 			}
+
+			if(lastSolution!=solution) {
+				if(lastSolution!=NULL){
+					if(lastSolution->getConflictGraph()!=solution->getConflictGraph()){
+						delete lastSolution->getConflictGraph();
+					}
+					delete lastSolution;
+				}
+				lastSolution = solution;
+				solutionTimes.push_back(solutionTime);
+
+				averageConflictSizeToSource=(averageConflictSizeToSource*numSolutions+(double)lastSolutionInterval[3])/(numSolutions+1);
+				averageConflictSizeToFirstTarget=(averageConflictSizeToFirstTarget*numSolutions+(double)lastSolutionInterval[2])/(numSolutions+1);
+				numSolutions++;
+			}
 		}
 		lastSolutionInterval[1]=periodNotification->periodEndTime;
+
 		double weightedConflictSizeOfPeriod=0;
 		double firstIntervalStart=-1;
-		for(std::vector<int*>::iterator it=solutionIntervals->begin(); it!=solutionIntervals->end();it++){
+		double periodTime = 0;
+		for(std::vector<int*>::iterator it=solutionIntervals->begin(); it!=solutionIntervals->end(); it++){
 			int* solutionInterval = *it;
 			double intervalStart = (double)solutionInterval[0]/1000.0;
 			double intervalEnd = (double)solutionInterval[1]/1000.0;
@@ -104,15 +121,18 @@ struct ConflictSizeSimulationObserver {
 				if(firstIntervalStart==-1){
 					firstIntervalStart=intervalStart;
 				}
-				weightedConflictSizeOfPeriod+=(intervalEnd-intervalStart+1.0)*(double)solutionInterval[2];
-				averageConflictSizeToSource=(averageConflictSizeToSource*numSolutions+(double)solutionInterval[3])/(++numSolutions);
+				int intervalTime = intervalEnd-intervalStart+1.0;
+				periodTime += intervalTime;
+				weightedConflictSizeOfPeriod+=intervalTime*(double)solutionInterval[2];
 			}
 		}
 		int* solutionInterval = *(solutionIntervals->end()-1);
 		double lastIntervalEnd = (double)solutionInterval[1]/1000.0;
-		double periodTime = lastIntervalEnd-firstIntervalStart+1;
-		averageConflictSize = (averageConflictSize*totalTime+weightedConflictSizeOfPeriod)/(totalTime+periodTime);
-		totalTime+=periodTime;
+
+		if(periodTime!=0) {
+			averageConflictSize = (averageConflictSize*totalTime+weightedConflictSizeOfPeriod)/(totalTime+periodTime);
+			totalTime+=periodTime;
+		}
 
 		if(lastConflictGraphFree) {
 			delete lastConflictGraph;
@@ -166,24 +186,39 @@ int main(int argc, char** argv) {
 				int problemUpdatePeriod = atoi(argv[17]);
 				int optimizationPeriod = atoi(argv[18]);
 				int numberOfPeriods = atoi(argv[19]);
+				int numberOfOptimizations = atoi(argv[20]);
 
 				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, optimizationPeriod,
 						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
 				RandomDynamicConflictGraphGeneratorParameters cggParameters(areaWidth, areaHeight, numPoints, numPositionsPerPoint, labelWidth, labelHeight);
-				GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods);
-				runGADPLPWithSimulation(gadplpParameters, cggParameters, simulationParameters);
+				GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods, numberOfOptimizations);
+				runGADPLPSimulation(gadplpParameters, cggParameters, simulationParameters);
+			} else if(testType=="withsimulationfromfilecoef") {
+				std::string problemPath = std::string(argv[12]);
+				int mode = atoi(argv[13]);
+				int problemUpdatePeriod = atoi(argv[14]);
+				int optimizationPeriod = atoi(argv[15]);
+				int numberOfPeriods = atoi(argv[16]);
+				int numberOfOptimizations = atoi(argv[17]);
+
+				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, optimizationPeriod,
+						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
+				PresentFileSetDCGG::Parameters cggParameters(problemPath);
+				GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods, numberOfOptimizations);
+				runGADPLPSimulation(gadplpParameters, cggParameters, simulationParameters);
 			} else if(testType=="withsimulationfromfile") {
 				std::string problemPath = std::string(argv[12]);
 				int mode = atoi(argv[13]);
 				int problemUpdatePeriod = atoi(argv[14]);
 				int optimizationPeriod = atoi(argv[15]);
 				int numberOfPeriods = atoi(argv[16]);
+				int numberOfOptimizations = atoi(argv[17]);
 
-				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, coefPop*numPoints, crossoverRate, mutationRate, 0, true, optimizationPeriod,
-						coefInitGen*numPoints, coefImmGen*numPoints, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
+				GADPLP::GADPLPParameters gadplpParameters(numPoints, numPositionsPerPoint, (int)coefPop, crossoverRate, mutationRate, 0, true, optimizationPeriod,
+						(int)coefInitGen, (int)coefImmGen, immRate, 0, groupProportion, groupProportionMargin, 0, 0, 0);
 				PresentFileSetDCGG::Parameters cggParameters(problemPath);
-				GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods);
-				runGADPLPWithSimulation(gadplpParameters, cggParameters, simulationParameters);
+				GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods, numberOfOptimizations);
+				runGADPLPSimulation(gadplpParameters, cggParameters, simulationParameters);
 			} else if(testType=="immigranttest") {
 				std::string problemPath = std::string(argv[12]);
 				int numInstances = atoi(argv[13]);
@@ -198,6 +233,25 @@ int main(int argc, char** argv) {
 			} else {
 				std::cout<<"Unidentified type of test!"<<std::endl;
 			}
+		} else if(testType=="fhplpsimulation") {
+			int numPoints = atoi(argv[2]);
+			int numPositionsPerPoint = atoi(argv[3]);
+			int greedyMethod = atoi(argv[4]);
+			int greedySubmethod = atoi(argv[5]);
+			double a = atof(argv[6]);
+			double b = atof(argv[7]);
+			int hc = atoi(argv[8]);
+			int localSearch = atoi(argv[9]);
+			int mode = atoi(argv[10]);
+			int problemUpdatePeriod = atoi(argv[11]);
+			int optimizationPeriod = atoi(argv[12]);
+			int numberOfPeriods = atoi(argv[13]);
+			int numberOfOptimizations = atoi(argv[14]);
+			std::string problemPath = std::string(argv[15]);
+			fhplp::FastHeuristicPLPParameters fhplpParameters(numPoints, numPositionsPerPoint, greedyMethod, greedySubmethod, a, b, hc, localSearch);
+			PresentFileSetDCGG::Parameters cggParameters(problemPath);
+			GADPLPSimulationParameters simulationParameters(mode, problemUpdatePeriod, optimizationPeriod, numberOfPeriods, numberOfOptimizations);
+			runFHPLPSimulation(fhplpParameters, cggParameters, simulationParameters);
 		} else if(testType=="cggtest") {
 			testDynamicConflictGraphGenerator();
 		} else if(testType=="tofile") {
@@ -226,27 +280,58 @@ int main(int argc, char** argv) {
 	}
 }
 
-void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, RandomDynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
+void runGADPLPSimulation(GADPLP::GADPLPParameters& gadplpParameters, RandomDynamicConflictGraphGeneratorParameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
 	GADPLP::GADPLP* gadplp = new GADPLP::GADPLP();
 	gadplp->init(gadplpParameters);
+	labelplacement::Solution* initialSolution = new labelplacement::Solution(NULL);
+	int* labelPlacements = new int[gadplpParameters.numPoints];
+	for(int i=0; i<gadplpParameters.numPoints; i++) {
+		labelPlacements[i]=i%gadplpParameters.numPositionsPerPoint;
+	}
+	initialSolution->setLabelPlacements(labelPlacements);
 	ConflictGraphGenerator* confgraphgen = new RandomDynamicConflictGraphGenerator(cggParameters);
-	runGADPLPWithSimulation(gadplp, confgraphgen, simulationParameters);
+	std::function<GADPLPSimulation::Optimizer> optimizer = std::bind(&GADPLP::GADPLP::optimize, gadplp, std::placeholders::_1);
+	runDPLPSimulation(optimizer, confgraphgen, simulationParameters, initialSolution);
+	delete gadplp;
 }
 
-void runGADPLPWithSimulation(GADPLP::GADPLPParameters& gadplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
+void runGADPLPSimulation(GADPLP::GADPLPParameters& gadplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
 	GADPLP::GADPLP* gadplp = new GADPLP::GADPLP();
 	gadplp->init(gadplpParameters);
+	labelplacement::Solution* initialSolution = new labelplacement::Solution(NULL);
+	int* labelPlacements = new int[gadplpParameters.numPoints];
+	for(int i=0; i<gadplpParameters.numPoints; i++) {
+		labelPlacements[i]=i%gadplpParameters.numPositionsPerPoint;
+	}
+	initialSolution->setLabelPlacements(labelPlacements);
 	ConflictGraphGenerator* confgraphgen = new PresentFileSetDCGG(cggParameters);
-	runGADPLPWithSimulation(gadplp, confgraphgen, simulationParameters);
+	std::function<GADPLPSimulation::Optimizer> optimizer = std::bind(&GADPLP::GADPLP::optimize, gadplp, std::placeholders::_1);
+	runDPLPSimulation(optimizer, confgraphgen, simulationParameters, initialSolution);
+	delete gadplp;
 }
 
-void runGADPLPWithSimulation(GADPLP::GADPLP* gadplp, ConflictGraphGenerator* cgg, GADPLPSimulationParameters& simulationParameters) {
-	GADPLPSimulation gadplpSimulation(cgg, gadplp, simulationParameters);
+void runFHPLPSimulation(fhplp::FastHeuristicPLPParameters& fhplpParameters, PresentFileSetDCGG::Parameters& cggParameters, GADPLPSimulationParameters& simulationParameters) {
+	fhplp::FastHeuristicPLP fhplp;
+	fhplp.init(fhplpParameters);
+	fhplp::FHPLPOptimizerAdaptor fhplpOptimizerAdaptor(&fhplp);
+	labelplacement::Solution* initialSolution = new labelplacement::Solution(NULL);
+	int* labelPlacements = new int[fhplpParameters.numPoints];
+	for(int i=0; i<fhplpParameters.numPoints; i++) {
+		labelPlacements[i]=i%fhplpParameters.numPositionsPerPoint;
+	}
+	initialSolution->setLabelPlacements(labelPlacements);
+	ConflictGraphGenerator* confgraphgen = new PresentFileSetDCGG(cggParameters);
+	std::function<GADPLPSimulation::Optimizer> optimizer = std::bind(&fhplp::FHPLPOptimizerAdaptor::optimize, fhplpOptimizerAdaptor, std::placeholders::_1);
+	runDPLPSimulation(optimizer, confgraphgen, simulationParameters, initialSolution);
+}
+
+void runDPLPSimulation(std::function<GADPLPSimulation::Optimizer> optimizer, ConflictGraphGenerator* cgg, GADPLPSimulationParameters& simulationParameters, labelplacement::Solution* initialSolution) {
+	GADPLPSimulation gadplpSimulation(cgg, optimizer, simulationParameters);
 	std::function<void(GADPLPSimulation::GADPLPSimulationPeriodNotification*)> conflictSizeSimulationObserverFn = ConflictSizeSimulationObserver();
 	ConflictSizeSimulationObserver* conflictSizeSimulationObserver = conflictSizeSimulationObserverFn.target<ConflictSizeSimulationObserver>();
 
 	std::cout<<"START\tEND\tCONF SRC\tCONF TGT"<<std::endl;
-	gadplpSimulation.runSimulation(conflictSizeSimulationObserverFn);
+	gadplpSimulation.runSimulation(conflictSizeSimulationObserverFn, initialSolution);
 	std::cout<<"SOL TMS";
 	double totalSolTime=0;
 	int numSolutions=conflictSizeSimulationObserver->solutionTimes.size();
@@ -258,10 +343,20 @@ void runGADPLPWithSimulation(GADPLP::GADPLP* gadplp, ConflictGraphGenerator* cgg
 	std::cout<<std::endl;
 	double lastSolTime = (double)conflictSizeSimulationObserver->solutionTimes.at(numSolutions-1)/1000.0;
 	double avgSoltTime = lastSolTime/(double)numSolutions;
-	double avgConfGraphChange = conflictSizeSimulationObserver->averageConflictGraphChange;
-
-	std::cout<<"AVG CONF\tAVG CONF SRC\tAVG SOL TIME\tAVG CHG"<<std::endl;
-	std::cout<<"OVERALL\t"<<conflictSizeSimulationObserver->averageConflictSize<<"\t"<<conflictSizeSimulationObserver->averageConflictSizeToSource<<"\t"<<avgSoltTime<<"\t"<<avgConfGraphChange<<std::endl;
+	double confGraphChangeSum=0;
+	int confGraphChangeCount=conflictSizeSimulationObserver->conflictGraphChanges.size();
+	for(int i=0; i<confGraphChangeCount; i++) {
+		confGraphChangeSum+=(double)conflictSizeSimulationObserver->conflictGraphChanges[i]/(double)conflictSizeSimulationObserver->conflictGraphSizes[i];
+	}
+	double avgConfGraphChange = confGraphChangeSum/(double)confGraphChangeCount;
+	double meanDistanceSquaredSum=0;
+	for(int i=0; i<confGraphChangeCount; i++) {
+		meanDistanceSquaredSum+=pow((double)conflictSizeSimulationObserver->conflictGraphChanges[i]/(double)conflictSizeSimulationObserver->conflictGraphSizes[i]-avgConfGraphChange,2);
+	}
+	double confGraphChangeStdDev = sqrt(meanDistanceSquaredSum/(double)confGraphChangeCount);
+	std::cout<<"AVG CONF\tAVG CONF SRC\tAVG CONF TARGET\tAVG SOL TIME\tAVG CHG\tST DEV CHG"<<std::endl;
+	std::cout<<"OVERALL\t"<<conflictSizeSimulationObserver->averageConflictSize<<"\t"<<conflictSizeSimulationObserver->averageConflictSizeToSource<<"\t"
+			<<conflictSizeSimulationObserver->averageConflictSizeToFirstTarget<<"\t"<<avgSoltTime<<"\t"<<avgConfGraphChange<<"\t"<<confGraphChangeStdDev<<std::endl;
 }
 
 void runGADPLPFromFile(std::string problemPath, int numInstances, int* instanceNumbers, GADPLP::GADPLPParameters gaplpParameters){
@@ -270,7 +365,7 @@ void runGADPLPFromFile(std::string problemPath, int numInstances, int* instanceN
 	gadplp.init(gaplpParameters);
 	for(int i=0; i<numInstances; i++) {
 		int instanceNumber = instanceNumbers[i];
-		std::string filename = (instanceNumber < 10 ? "0" : "") + std::to_string(instanceNumber) + ".dat";
+		std::string filename = "d" + std::to_string(gaplpParameters.numPoints) + "_" + (instanceNumber < 10 ? "0" : "") + std::to_string(instanceNumber) + ".dat";
 		std::cout << "I: " << problemPath + filename;
 		std::string instanceFullPath = problemPath + filename;
 		labelplacement::ConflictGraph* cg = cgl.load(instanceFullPath);

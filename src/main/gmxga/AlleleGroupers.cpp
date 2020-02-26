@@ -30,6 +30,12 @@ GroupsT BoundedDiameterMinCutClusterGrouper::operator()(graph::Graph* graph) {
 	return groups;
 }
 
+
+RandomPivotDiameterClusterGrouper::RandomPivotDiameterClusterGrouper(int depth, int maxBranchingFactor) {
+	this->depth = depth;
+	this->maxBranchingFactor = maxBranchingFactor;
+}
+
 GroupsT RandomPivotDiameterClusterGrouper::clusterGraph(graph::Graph* graph) {
 	const int vertexNumber = graph->getVertexNumber();
 	std::vector<std::vector<int>*>* clusters = new std::vector<std::vector<int>*>();

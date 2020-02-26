@@ -17,7 +17,7 @@ PresentFileSetDCGG::Parameters::Parameters(std::string path) {
 
 PresentFileSetDCGG::PresentFileSetDCGG(Parameters parameters) {
 	this->path = parameters.path;
-	currentState = 0;
+	currentState = 200;
 
 }
 

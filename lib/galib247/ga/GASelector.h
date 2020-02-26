@@ -93,6 +93,22 @@ public:
 };
 #endif
 
+#if USE_RANDOM_TOURNAMENT_SELECTOR == 1
+class GARandomTournamentSelector : public GASelectionScheme {
+public:
+	int tournament_size = 5;
+  GADefineIdentity("GARandomTournamentSelector", GAID::RandomTournamentSelection);
+
+  GARandomTournamentSelector(int w=GASelectionScheme::SCALED) : GASelectionScheme(w) {}
+  GARandomTournamentSelector(const GARandomTournamentSelector& orig) { copy(orig); }
+  GARandomTournamentSelector& operator=(const GASelectionScheme& orig)
+    { if(&orig != this) copy(orig); return *this; }
+  virtual ~GARandomTournamentSelector() {}
+  virtual GASelectionScheme* clone() const { return new GARandomTournamentSelector; }
+  virtual GAGenome& select() const;
+};
+#endif
+
   
 /* ----------------------------------------------------------------------------
    Roulette wheel uses a fitness-proportional algorithm for selecting 

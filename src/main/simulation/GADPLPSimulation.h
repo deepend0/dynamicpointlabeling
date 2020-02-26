@@ -8,7 +8,6 @@
 #ifndef _SIMULATION_GADPLPSIMULATION_H_
 #define _SIMULATION_GADPLPSIMULATION_H_
 
-#include "GADPLP.h"
 #include "Solution.h"
 
 #include <functional>
@@ -16,11 +15,12 @@
 #include "ConflictGraphGenerator.h"
 
 struct GADPLPSimulationParameters {
-	GADPLPSimulationParameters(int mode, int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods);
+	GADPLPSimulationParameters(int mode, int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods, int numberOfOptimizations);
 	int mode;
 	int problemUpdatePeriod;
 	int optimizationPeriod;
 	int numberOfPeriods;
+	int numberOfOptimizations;
 };
 class GADPLPSimulation {
 private:
@@ -38,16 +38,18 @@ public:
 		std::vector<int>* solutionTimes = NULL;
 	};
 
-	GADPLPSimulation(ConflictGraphGenerator* confgraphgen, GADPLP::GADPLP* gadplp, GADPLPSimulationParameters parameters);
+	typedef labelplacement::Solution& Optimizer(labelplacement::ConflictGraph& conflictGraph);
+	GADPLPSimulation(ConflictGraphGenerator* confgraphgen, std::function<Optimizer> optimizer, GADPLPSimulationParameters parameters);
 	virtual ~GADPLPSimulation();
-	void runSimulation(std::function<void(GADPLPSimulationPeriodNotification*)>& simulationObserver);
+	void runSimulation(std::function<void(GADPLPSimulationPeriodNotification*)>& simulationObserver, labelplacement::Solution* initialSolution);
 private:
 	ConflictGraphGenerator* confgraphgen;
-	GADPLP::GADPLP* gadplp;
+	std::function<Optimizer> optimizer;
 	int mode;
 	int problemUpdatePeriod;
 	int optimizationPeriod;
 	int numberOfPeriods;
+	int numberOfOptimizations;
 };
 
 

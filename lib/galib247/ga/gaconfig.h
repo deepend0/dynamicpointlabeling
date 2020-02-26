@@ -545,6 +545,7 @@ of the objects in GAlib.
 #define USE_RANK_SELECTOR            1
 #define USE_ROULETTE_SELECTOR        1
 #define USE_TOURNAMENT_SELECTOR      1
+#define USE_RANDOM_TOURNAMENT_SELECTOR      1
 #define USE_DS_SELECTOR              1
 #define USE_SRS_SELECTOR             1
 #define USE_UNIFORM_SELECTOR         1

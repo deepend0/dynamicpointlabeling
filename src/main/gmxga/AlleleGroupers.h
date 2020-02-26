@@ -26,6 +26,7 @@ struct RandomPivotDiameterClusterGrouper {
 
 	int depth;
 	int maxBranchingFactor;
+	RandomPivotDiameterClusterGrouper(int depth, int maxBranchingFactor);
 	GroupsT operator()(graph::Graph* graph);
 	GroupsT clusterGraph(graph::Graph* graph);
 };

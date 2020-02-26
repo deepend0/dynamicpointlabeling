@@ -381,7 +381,7 @@ Graph** BoundDiameterMinCutClustering::boundedDiameterMinCut(Graph* component,
 			/ (double) componentVertexNumber;
 	//cout<<"boundedDiameterMinCut>>diameter limit: "<<diameter<<" vertex number: "<<componentVertexNumber<<" avg inc: "<<avgIncidenceFactor<<endl;
 	//int numIterations = (int)ceil((componentVertexNumber-1.0)*componentVertexNumber/2.0*log(componentVertexNumber));
-	int numIterations = componentVertexNumber;
+	int numIterations = 10*componentVertexNumber;
 	//cout<<"boundedDiameterMinCut>>numIterations: "<<numIterations<<endl;
 	double minEval = INT_MAX;
 	Graph** minSubComponents = new Graph*[2];
@@ -454,7 +454,7 @@ Graph** BoundDiameterMinCutClustering::boundedDiameterMinCut(Graph* component,
 vector<Graph*>* BoundDiameterMinCutClustering::cluster(graph::Graph* graph,
 		int diameterLimit) {
 
-	vector<Graph*>* components = findComponentsBFS(graph, 50);
+	vector<Graph*>* components = findComponentsBFS(graph, 100);
 	//cout<<"cluster>>components size: "<<components->size()<<endl;
 	vector<Graph*>* clusters = new vector<Graph*>();
 	for (int i = 0; i < components->size(); i++) {

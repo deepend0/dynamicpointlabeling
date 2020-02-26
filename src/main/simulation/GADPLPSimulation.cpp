@@ -9,12 +9,14 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <cmath>
 
-GADPLPSimulationParameters::GADPLPSimulationParameters(int mode, int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods) {
+GADPLPSimulationParameters::GADPLPSimulationParameters(int mode, int problemUpdatePeriod, int optimizationPeriod, int numberOfPeriods, int numberOfOptimizations) {
 	this->mode = mode;
 	this->problemUpdatePeriod = problemUpdatePeriod;
 	this->optimizationPeriod = optimizationPeriod;
 	this->numberOfPeriods = numberOfPeriods;
+	this->numberOfOptimizations = numberOfOptimizations;
 }
 GADPLPSimulation::GADPLPSimulationPeriodNotification::GADPLPSimulationPeriodNotification() {
 }
@@ -22,18 +24,18 @@ GADPLPSimulation::GADPLPSimulationPeriodNotification::~GADPLPSimulationPeriodNot
 	delete solutions;
 	delete solutionTimes;
 }
-GADPLPSimulation::GADPLPSimulation(ConflictGraphGenerator* confgraphgen, GADPLP::GADPLP* gadplp, GADPLPSimulationParameters parameters) {
+GADPLPSimulation::GADPLPSimulation(ConflictGraphGenerator* confgraphgen, std::function<Optimizer> optimizer, GADPLPSimulationParameters parameters) {
 	this->confgraphgen = confgraphgen;
-	this->gadplp = gadplp;
+	this->optimizer = optimizer;
 	this->mode = parameters.mode;
 	this->problemUpdatePeriod = parameters.problemUpdatePeriod;
 	this->optimizationPeriod = parameters.optimizationPeriod;
 	this->numberOfPeriods = parameters.numberOfPeriods;
+	this->numberOfOptimizations = parameters.numberOfOptimizations;
 }
 
 
 GADPLPSimulation::~GADPLPSimulation() {
-	delete gadplp;
 	delete confgraphgen;
 }
 
@@ -75,16 +77,17 @@ GADPLPSimulation::~GADPLPSimulation() {
 	return result;
 }*/
 
-void GADPLPSimulation::runSimulation(std::function<void(GADPLPSimulationPeriodNotification*)>& simulationObserver) {
+void GADPLPSimulation::runSimulation(std::function<void(GADPLPSimulationPeriodNotification*)>& simulationObserver, labelplacement::Solution* initialSolution) {
 	//Last occured solution in timeline
 	labelplacement::Solution* lastSolution = NULL;
 	int lastSolutionTime=-1;
 	//Future solution
 	int nextOptimizationTime=0;
+	int currentNumberOfOptimizations=0;
 	std::vector<labelplacement::Solution*> forwardSolutions;
 	std::vector<int> forwardSolutionTimes;
 
-	for(int i=0; i<numberOfPeriods; i++) {
+	for(int i=0; i<numberOfPeriods && (currentNumberOfOptimizations<numberOfOptimizations || nextOptimizationTime>=i*problemUpdatePeriod); i++) {
 		GADPLPSimulationPeriodNotification* periodNotification = new GADPLPSimulationPeriodNotification();
 		periodNotification->conflictGraph = confgraphgen->generate(1);
 		periodNotification->solutions = new std::vector<labelplacement::Solution*>();
@@ -93,19 +96,28 @@ void GADPLPSimulation::runSimulation(std::function<void(GADPLPSimulationPeriodNo
 		periodNotification->periodStartTime = i*problemUpdatePeriod;
 		periodNotification->periodEndTime = (i+1)*problemUpdatePeriod-1;
 
-		while(nextOptimizationTime>=periodNotification->periodStartTime && nextOptimizationTime<=periodNotification->periodEndTime){
+		/*if(i==0) {
+			lastSolution = initialSolution;
+			lastSolutionTime = 0;
+			initialSolution->setConflictGraph(periodNotification->conflictGraph);
+			forwardSolutions.push_back(lastSolution);
+			forwardSolutionTimes.push_back(lastSolutionTime);
+		}*/
+		while(nextOptimizationTime>=periodNotification->periodStartTime && nextOptimizationTime<=periodNotification->periodEndTime
+				&& currentNumberOfOptimizations<numberOfOptimizations){
 			//Optimization time must be greater than 0.
 			//std::cout<<"Next Opt Time: "<<nextOptimizationTime<<std::endl;
 			clock_t startG = clock();
-			labelplacement::Solution* forwardSolution = &gadplp->optimize(*periodNotification->conflictGraph);
+			labelplacement::Solution* forwardSolution = &optimizer(*periodNotification->conflictGraph);
 			clock_t endG = clock();
-			int optimizationTime = 1000 * (endG - startG) / CLOCKS_PER_SEC;
+			int optimizationTime = ceil((double)1000 * ((double)endG - (double)startG) / (double)CLOCKS_PER_SEC);
 			int nextSolutionTime = nextOptimizationTime+optimizationTime;
 			forwardSolution->setConflictGraph(periodNotification->conflictGraph);
 			periodNotification->optimizationOccured=true;
 			forwardSolutions.push_back(forwardSolution);
 			forwardSolutionTimes.push_back(nextSolutionTime);
 
+			currentNumberOfOptimizations++;
 			if(mode==0) {
 				nextOptimizationTime+=optimizationTime;
 			} else if(mode==1) {

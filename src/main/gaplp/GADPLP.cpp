@@ -145,7 +145,7 @@ void GADPLP::init(GADPLPParameters& parameters) {
 		parameters.populationSize++;
 	ga->populationSize(parameters.populationSize);
 	if(parameters.selector == 0) {
-		ga->selector(GATournamentSelector());
+		ga->selector(GARandomTournamentSelector());
 	}
 	ga->elitist(parameters.elitist?GABoolean::gaTrue:GABoolean::gaFalse);
 	ga->setPeriod(parameters.period);
@@ -160,6 +160,7 @@ void GADPLP::init(GADPLPParameters& parameters) {
 		std::function<UniformRankedGroupMaskingCrossover::AlleleEvaluator>* evaluator = new std::function<UniformRankedGroupMaskingCrossover::AlleleEvaluator>(AlleleEvaluator());
 		crossover->setEvaluator(evaluator);
 		crossover->setGrouper(BoundedDiameterMinCutClusterGrouper(1));
+		//crossover->setGrouper(RandomPivotDiameterClusterGrouper(1,10));
 		ga->setCrossover(crossover);
 	}
 	ga->set(gaNpCrossover, parameters.crossoverRate);

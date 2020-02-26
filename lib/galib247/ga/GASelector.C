@@ -51,6 +51,21 @@ GARankSelector::select() const {
 }
 #endif
 
+#if USE_RANDOM_TOURNAMENT_SELECTOR == 1
+GAGenome &
+GARandomTournamentSelector::select() const {
+	  int bestGenomeIndex = -1;
+	  for(int i=0; i<tournament_size; i++) {
+		  int genomeIndex = GARandomInt(0,pop->size()-1);
+
+		  if(bestGenomeIndex==-1 || pop->individual(genomeIndex).score()<pop->individual(bestGenomeIndex).score()) {
+			  bestGenomeIndex = genomeIndex;
+		  }
+	  }
+	  return pop->individual(bestGenomeIndex);
+}
+#endif
+
 
 /* ----------------------------------------------------------------------------
 UniformSelector

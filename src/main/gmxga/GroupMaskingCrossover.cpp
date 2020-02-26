@@ -7,6 +7,7 @@
 
 #include "GroupMaskingCrossover.h"
 
+#include <iostream>
 #include <algorithm>
 
 using namespace std;
@@ -83,10 +84,17 @@ void UniformRankedGroupMaskingCrossover::initialize(graph::Graph* graph) {
 		}
 		delete groups;
 	}
-	if(groupProportion!=0 && groupProportionMargin!=0) {
+
+	if(groupProportion!=0 || groupProportionMargin!=0) {
+
+		clock_t startG = clock();
 		groups = grouper(graph);
 		numberOfGroups = groups->size();
+		clock_t endG = clock();
+		int groupingTime = 1000 * (endG - startG) / CLOCKS_PER_SEC;
+		cout<<"\tGRP T: "<<groupingTime;
 	}
+	//cout<<"\tNUM GRP: "<<numberOfGroups;
 	GroupMaskingCrossover::initialize(graph);
 	alleleNumber = graph->getVertices()->size();
 }

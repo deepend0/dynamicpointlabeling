@@ -44,6 +44,8 @@ public:
 
 	virtual void initialize(unsigned int seed=0);
 
+	virtual void step();
+
 	virtual void evolve(unsigned int seed=0);
 
 private:
